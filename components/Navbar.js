@@ -17,13 +17,8 @@ export default function Navbar() {
             Geo<span className="text-official-teal">Home</span>
           </Link>
           <div className="hidden items-center gap-6 text-sm font-medium text-anchor-gray md:flex">
-            <a href="#tenants" className="transition hover:text-official-teal">Tenants</a>
-            <a href="#landlords" className="transition hover:text-official-teal">Landlords</a>
             <a href="#how-it-works" className="transition hover:text-official-teal">How it works</a>
             {user && <Link href="/chat" className="transition hover:text-official-teal">Messages</Link>}
-            {role === 'landlord' && <Link href="/dashboard" className="transition hover:text-official-teal">Dashboard</Link>}
-            {role === 'agent' && <Link href="/agent" className="transition hover:text-official-teal">Agent</Link>}
-            {role === 'admin' && <Link href="/admin" className="transition hover:text-official-teal">Admin</Link>}
           </div>
         </div>
 
