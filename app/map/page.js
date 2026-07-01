@@ -20,21 +20,47 @@ export default function MapPage() {
       setError("")
 
       try {
-        const { data, error: rpcError } = await supabase.rpc("properties_in_boundary", {
-          boundary_name: "kisumu",
-        })
+        console.log("🔄 Fetching properties from Supabase...")
+        
+        // Direct query from properties table - simpler and more reliable
+        const { data: properties, error: queryError } = await supabase
+          .from("properties")
+          .select("*")
+          .eq("available", true)
+          .eq("is_active", true)
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .order("created_at", { ascending: false })
 
         if (!active) return
 
-        if (rpcError) {
-          console.error("Properties RPC error:", rpcError)
+        if (queryError) {
+          console.error("❌ Database query error:", queryError)
           setError("Failed to load properties. Please try again.")
           return
         }
 
-        setProperties((data || []).filter((property) => property.available !== false))
+        console.log(`✅ Fetched ${(properties || []).length} properties from database`)
+        
+        if (!properties || properties.length === 0) {
+          console.warn("⚠️ No properties found in database")
+          setProperties([])
+          return
+        }
+
+        // Validate properties have required coordinates
+        const validProperties = properties.filter((prop) => {
+          if (prop.lat == null || prop.lng == null) {
+            console.warn(`Property ${prop.id} missing coordinates:`, { lat: prop.lat, lng: prop.lng })
+            return false
+          }
+          return true
+        })
+
+        console.log(`📍 ${validProperties.length} properties with valid coordinates ready to display`)
+        setProperties(validProperties)
       } catch (err) {
-        console.error("Map page error:", err)
+        console.error("❌ Map page error:", err)
         if (active) {
           setError("Connection error. Please check your network.")
         }

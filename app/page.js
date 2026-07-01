@@ -24,45 +24,49 @@ export default function HomePage() {
       setError('')
 
       try {
-        let propertiesResponse = await supabase.rpc('properties_in_boundary', { boundary_name: 'kisumu' })
+        console.log("🔄 Loading homepage data...")
         
-        // Fallback: if RPC fails, fetch all verified properties
-        if (propertiesResponse.error) {
-          console.warn('RPC failed, using fallback:', propertiesResponse.error)
-          propertiesResponse = await supabase.from('properties').select('*').eq('verification_status', 'verified')
-        }
-
-        const [countiesResponse, listingsResponse, verifiedResponse, totalResponse] = await Promise.all([
+        const [propertiesResponse, countiesResponse, listingsResponse, verifiedResponse, totalResponse] = await Promise.all([
+          // Direct query instead of RPC for reliability
+          supabase
+            .from('properties')
+            .select('*')
+            .eq('available', true)
+            .eq('is_active', true)
+            .not('lat', 'is', null)
+            .not('lng', 'is', null)
+            .order('created_at', { ascending: false }),
           supabase.from('boundaries').select('*', { count: 'exact', head: true }).eq('category_name', 'county'),
-          supabase.from('properties').select('*', { count: 'exact', head: true }).eq('verification_status', 'verified').eq('available', true),
-          supabase.from('properties').select('*', { count: 'exact', head: true }).eq('verification_status', 'verified'),
+          supabase.from('properties').select('*', { count: 'exact', head: true }).eq('available', true).eq('is_active', true),
+          supabase.from('properties').select('*', { count: 'exact', head: true }),
           supabase.from('properties').select('*', { count: 'exact', head: true })
         ])
 
         if (!active) return
 
         if (propertiesResponse.error) {
-          console.error('Properties fetch error:', propertiesResponse.error)
-          setError(`Failed to load properties: ${propertiesResponse.error.message}`)
-          return
+          console.error("❌ Properties query error:", propertiesResponse.error)
         }
 
-        const fetchedProperties = (propertiesResponse.data || []).filter((property) => property.available !== false)
-        console.log(`Loaded ${fetchedProperties.length} properties:`, fetchedProperties)
+        console.log(`✅ Loaded ${(propertiesResponse.data || []).length} properties for display`)
 
-        const verifiedCount = verifiedResponse.count ?? 0
         const totalCount = totalResponse.count ?? 0
+        const verifiedCount = listingsResponse.count ?? 0
         const percentVerified = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0
 
-        setProperties(fetchedProperties)
+        setProperties((propertiesResponse.data || []).filter((property) => {
+          if (property.lat == null || property.lng == null) return false
+          return property.available !== false
+        }))
+        
         setStats({
           counties: countiesResponse.count ?? 0,
-          listings: listingsResponse.count ?? 0,
+          listings: verifiedCount,
           verified: percentVerified,
           totalProperties: totalCount
         })
       } catch (err) {
-        console.error(err)
+        console.error("❌ Homepage error:", err)
         if (active) {
           setError('Live listings are temporarily unavailable. Please try again shortly.')
         }

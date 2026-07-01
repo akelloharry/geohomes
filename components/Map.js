@@ -73,10 +73,18 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    properties.forEach((property) => {
+    console.log("Map component rendering properties:", properties.length)
+
+    properties.forEach((property, index) => {
       const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : null)
       const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : null)
-      if (lat == null || lng == null) return
+      
+      if (lat == null || lng == null) {
+        console.warn(`Property ${index} missing coordinates:`, { id: property.id, lat, lng })
+        return
+      }
+      
+      console.log(`Adding marker for property ${index}:`, { id: property.id, lat, lng, available: property.available })
 
       const markerElement = document.createElement('div')
       markerElement.className = 'marker'
@@ -113,6 +121,8 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
 
       markersRef.current.push(marker)
     })
+
+    console.log(`✅ Completed rendering ${markersRef.current.length} markers`)
 
     if (pinLocation) {
       if (pinRef.current) {
