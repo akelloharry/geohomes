@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeoHome — Landing</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    html,body,#map{height:100%;margin:0;padding:0}
+    .sidebar{position:absolute;top:10px;left:10px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-width:320px}
+    .prop{margin-bottom:8px;padding:6px;border-bottom:1px solid #eee}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="sidebar">
+    <h3>Simulated Properties</h3>
+    <div id="list"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const center = [-1.286389, 36.817223]; // Nairobi
+    const map = L.map('map').setView(center, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Generate simulated properties around center
+    function randomOffset() { return (Math.random()-0.5)*0.06; }
+    const properties = Array.from({length:12}).map((_,i)=>({
+      id: i+1,
+      title: `Property #${i+1}`,
+      price: Math.floor(30000 + Math.random()*120000),
+      coords: [center[0]+randomOffset(), center[1]+randomOffset()]
+    }));
+
+    const list = document.getElementById('list');
+
+    properties.forEach(p=>{
+      const m = L.marker(p.coords).addTo(map).bindPopup(`<strong>${p.title}</strong><br/>KES ${p.price.toLocaleString()}`);
+      const el = document.createElement('div');
+      el.className = 'prop';
+      el.innerHTML = `<strong>${p.title}</strong><br/>KES ${p.price.toLocaleString()} <button data-id="${p.id}">Show</button>`;
+      el.querySelector('button').addEventListener('click', ()=>{ map.setView(p.coords,15); m.openPopup(); });
+      list.appendChild(el);
+    });
+  </script>
+</body>
+</html>
