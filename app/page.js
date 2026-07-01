@@ -24,8 +24,15 @@ export default function HomePage() {
       setError('')
 
       try {
-        const [propertiesResponse, countiesResponse, listingsResponse, verifiedResponse, totalResponse] = await Promise.all([
-          supabase.rpc('properties_in_boundary', { boundary_name: 'kisumu' }),
+        let propertiesResponse = await supabase.rpc('properties_in_boundary', { boundary_name: 'kisumu' })
+        
+        // Fallback: if RPC fails, fetch all verified properties
+        if (propertiesResponse.error) {
+          console.warn('RPC failed, using fallback:', propertiesResponse.error)
+          propertiesResponse = await supabase.from('properties').select('*').eq('verification_status', 'verified')
+        }
+
+        const [countiesResponse, listingsResponse, verifiedResponse, totalResponse] = await Promise.all([
           supabase.from('boundaries').select('*', { count: 'exact', head: true }).eq('category_name', 'county'),
           supabase.from('properties').select('*', { count: 'exact', head: true }).eq('verification_status', 'verified').eq('available', true),
           supabase.from('properties').select('*', { count: 'exact', head: true }).eq('verification_status', 'verified'),
@@ -35,14 +42,19 @@ export default function HomePage() {
         if (!active) return
 
         if (propertiesResponse.error) {
-          console.error(propertiesResponse.error)
+          console.error('Properties fetch error:', propertiesResponse.error)
+          setError(`Failed to load properties: ${propertiesResponse.error.message}`)
+          return
         }
+
+        const fetchedProperties = (propertiesResponse.data || []).filter((property) => property.available !== false)
+        console.log(`Loaded ${fetchedProperties.length} properties:`, fetchedProperties)
 
         const verifiedCount = verifiedResponse.count ?? 0
         const totalCount = totalResponse.count ?? 0
         const percentVerified = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0
 
-        setProperties((propertiesResponse.data || []).filter((property) => property.available !== false))
+        setProperties(fetchedProperties)
         setStats({
           counties: countiesResponse.count ?? 0,
           listings: listingsResponse.count ?? 0,

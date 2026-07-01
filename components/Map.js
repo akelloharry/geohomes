@@ -59,10 +59,17 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
+    console.log(`Map rendering with ${properties.length} properties`)
     properties.forEach((property) => {
       const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : null)
       const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : null)
-      if (lat == null || lng == null) return
+      
+      if (lat == null || lng == null) {
+        console.warn('Property missing coordinates:', property.id, property)
+        return
+      }
+
+      console.log(`Adding marker for property ${property.id} at [${lng}, ${lat}]`)
 
       const markerElement = document.createElement('div')
       markerElement.className = 'marker'
