@@ -15,13 +15,12 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/placeholder.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-        <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-        <style>{`:root { --primary: #1E3A4D; --teal: #2C6E5C; --muted-teal: #5F8A7B; --estateRed: #B26A5C }`}</style>
+        <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="bg-cloud font-body text-midnight">
+      <body className="min-h-screen bg-cloud-white font-body text-anchor-gray">
         <AuthProvider>
           <Navbar />
-          <main className="max-w-6xl mx-auto p-4">{children}</main>
+          <main className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">{children}</main>
         </AuthProvider>
       </body>
     </html>

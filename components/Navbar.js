@@ -10,43 +10,43 @@ export default function Navbar() {
   const role = profile?.role ?? user?.user_metadata?.role
 
   return (
-    <nav className="w-full bg-white shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="font-heading text-2xl font-black text-primary">
-            Geo<span className="text-teal">Home</span>
+    <nav className="sticky top-0 z-50 w-full border-b border-pale-steel/70 bg-cloud-white/95 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 lg:justify-start">
+          <Link href="/" className="font-heading text-2xl font-black text-deep-maritime">
+            Geo<span className="text-official-teal">Home</span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm text-midnight">
-            <a href="#tenants" className="hover:text-teal transition">Tenants</a>
-            <a href="#landlords" className="hover:text-teal transition">Landlords</a>
-            <a href="#how-it-works" className="hover:text-teal transition">How it works</a>
-            {user && <Link href="/chat" className="hover:text-teal transition">Messages</Link>}
-            {role === 'landlord' && <Link href="/dashboard" className="hover:text-teal transition">Dashboard</Link>}
-            {role === 'agent' && <Link href="/agent" className="hover:text-teal transition">Agent</Link>}
-            {role === 'admin' && <Link href="/admin" className="hover:text-teal transition">Admin</Link>}
+          <div className="hidden items-center gap-6 text-sm font-medium text-anchor-gray md:flex">
+            <a href="#tenants" className="transition hover:text-official-teal">Tenants</a>
+            <a href="#landlords" className="transition hover:text-official-teal">Landlords</a>
+            <a href="#how-it-works" className="transition hover:text-official-teal">How it works</a>
+            {user && <Link href="/chat" className="transition hover:text-official-teal">Messages</Link>}
+            {role === 'landlord' && <Link href="/dashboard" className="transition hover:text-official-teal">Dashboard</Link>}
+            {role === 'agent' && <Link href="/agent" className="transition hover:text-official-teal">Agent</Link>}
+            {role === 'admin' && <Link href="/admin" className="transition hover:text-official-teal">Admin</Link>}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {user ? (
             <>
-              <span className="text-sm text-anchorGray hidden sm:inline">{user.email}</span>
+              <span className="hidden text-sm text-anchor-gray sm:inline">{user.email}</span>
               <button
                 onClick={async () => {
                   await signOut()
                   router.push('/')
                 }}
-                className="rounded-full border border-teal px-4 py-2 text-sm text-teal hover:bg-teal hover:text-white transition"
+                className="rounded-full border border-official-teal px-4 py-2 text-sm font-semibold text-official-teal transition hover:bg-official-teal hover:text-white"
               >
                 Sign out
               </button>
             </>
           ) : (
             <>
-              <Link href="/login" className="text-sm text-midnight hover:text-teal transition">
+              <Link href="/login" className="text-sm font-semibold text-anchor-gray transition hover:text-official-teal">
                 Login
               </Link>
-              <Link href="/signup" className="text-sm bg-teal text-white rounded-full px-4 py-2 hover:bg-primary transition">
+              <Link href="/signup" className="rounded-full bg-official-teal px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep-maritime">
                 Sign up
               </Link>
             </>

@@ -2,13 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary: #1E3A4D;
+  --official-teal: #2C6E5C;
+  --muted-teal: #5F8A7B;
+  --deep-maritime: #1E3A4D;
+  --cloud-white: #F4F6F9;
+  --pale-steel: #BECCD9;
+  --anchor-gray: #5B6F82;
+  --estate-red: #B26A5C;
+  --mint-hint: #D9E8E2;
+  --geohome-gold: #FBBF24;
+  --trust-teal: #14B8A6;
+}
+
 html, body, #__next {
   height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Open Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--cloud-white);
+  color: #1F2937;
 }
 
 .marker {
   display: block;
 }
 
-/* small app styles */
-body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+::selection {
+  background: var(--mint-hint);
+  color: var(--deep-maritime);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
