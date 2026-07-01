@@ -3,13 +3,27 @@
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+
+if (!mapboxToken) {
+  console.error('⚠️ Mapbox token (NEXT_PUBLIC_MAPBOX_TOKEN) is missing!')
+}
+
+mapboxgl.accessToken = mapboxToken || ''
 
 export default function Map({ center = [34.7617, -0.0917], properties = [], zoom = 13, className = '', onMarkerClick, onPinMove, draggable = false, pinLocation }) {
   const mapContainer = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
   const pinRef = useRef(null)
+
+  if (!mapboxToken) {
+    return (
+      <div className={`flex items-center justify-center rounded-[24px] bg-cloud-white ${className}`.trim()}>
+        <p className="text-sm text-anchor-gray">Map configuration error. Please check environment variables.</p>
+      </div>
+    )
+  }
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -59,17 +73,10 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    console.log(`Map rendering with ${properties.length} properties`)
     properties.forEach((property) => {
       const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : null)
       const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : null)
-      
-      if (lat == null || lng == null) {
-        console.warn('Property missing coordinates:', property.id, property)
-        return
-      }
-
-      console.log(`Adding marker for property ${property.id} at [${lng}, ${lat}]`)
+      if (lat == null || lng == null) return
 
       const markerElement = document.createElement('div')
       markerElement.className = 'marker'
