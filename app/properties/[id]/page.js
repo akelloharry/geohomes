@@ -160,6 +160,7 @@ export default function PropertyDetail({ params }) {
   const [property, setProperty] = useState(null)
   const [units, setUnits] = useState([])
   const [landlord, setLandlord] = useState(null)
+  const [locationPath, setLocationPath] = useState('')
   const [error, setError] = useState(null)
   const { user, profile } = useAuth()
   const [hasPass, setHasPass] = useState(false)
@@ -214,12 +215,22 @@ export default function PropertyDetail({ params }) {
 
       setProperty(data)
       setError(null)
+      setLocationPath('')
+
+      try {
+        const { data: pathData, error: pathError } = await supabase.rpc('get_property_location_path', { property_id: id })
+        if (!pathError) {
+          setLocationPath(pathData || '')
+        }
+      } catch (e) {
+        console.warn('Location path lookup failed', e)
+      }
 
       if (data?.landlord_id) {
         try {
           const { data: owner, error: ownerError } = await supabase
             .from('profiles')
-            .select('*')
+            .select('first_name,last_name,phone,email,full_name')
             .eq('id', data.landlord_id)
             .maybeSingle()
 
@@ -422,7 +433,7 @@ export default function PropertyDetail({ params }) {
   const deposit = property.deposit || property.deposit_amount || 0
   const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : 34.7617)
   const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : -0.0917)
-  const landlordName = landlord?.full_name || landlord?.first_name ? [landlord?.first_name, landlord?.last_name].filter(Boolean).join(' ') : 'Landlord'
+  const landlordName = landlord?.full_name || [landlord?.first_name, landlord?.last_name].filter(Boolean).join(' ') || 'Landlord'
   const activePass = hasPass && !loadingPass
 
   return (
@@ -467,8 +478,9 @@ export default function PropertyDetail({ params }) {
                 <h1 className="text-2xl font-semibold text-slate-900">{property.title || 'Property details'}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                   <MapPinIcon className="h-4 w-4 text-teal" />
-                  <span>{property.address || 'No address available'}</span>
+                  <span>{locationPath || 'Location path unavailable'}</span>
                 </div>
+                <div className="mt-1 text-sm text-slate-500">{property.address || 'No address available'}</div>
               </div>
               <div className="rounded-full bg-mintHint px-3 py-1 text-sm font-medium text-teal">
                 {property.available === false ? 'Unavailable' : 'Available now'}
