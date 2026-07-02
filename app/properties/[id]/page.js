@@ -47,9 +47,18 @@ export default function PropertyDetail({ params }) {
 
       if (data?.landlord_id) {
         try {
-          const { data: owner, error: ownerError } = await supabase.from('profiles').select('*').eq('id', data.landlord_id).single()
-          if (ownerError) console.warn('Failed to load landlord profile', ownerError)
-          setLandlord(owner || null)
+          const { data: owner, error: ownerError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.landlord_id)
+            .maybeSingle()
+
+          if (ownerError) {
+            console.warn('Failed to load landlord profile', ownerError)
+            setLandlord(null)
+          } else {
+            setLandlord(owner || null)
+          }
         } catch (e) {
           console.warn('Exception fetching landlord profile', e)
           setLandlord(null)
