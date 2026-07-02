@@ -230,7 +230,7 @@ export default function PropertyDetail({ params }) {
         try {
           const { data: owner, error: ownerError } = await supabase
             .from('profiles')
-            .select('first_name,last_name,phone,email,full_name')
+            .select('full_name, phone, role')
             .eq('id', data.landlord_id)
             .maybeSingle()
 
@@ -433,7 +433,7 @@ export default function PropertyDetail({ params }) {
   const deposit = property.deposit || property.deposit_amount || 0
   const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : 34.7617)
   const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : -0.0917)
-  const landlordName = landlord?.full_name || [landlord?.first_name, landlord?.last_name].filter(Boolean).join(' ') || 'Landlord'
+  const landlordName = landlord?.full_name || 'Landlord'
   const activePass = hasPass && !loadingPass
 
   return (
