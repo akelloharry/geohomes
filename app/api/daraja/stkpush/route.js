@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 
+function readEnv(name) {
+  return process.env[name] || process.env[`NEXT_PUBLIC_${name}`] || null
+}
+
 async function getToken(baseUrl, consumerKey, consumerSecret) {
   try {
     const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64')
@@ -16,14 +20,15 @@ async function getToken(baseUrl, consumerKey, consumerSecret) {
 export async function POST(req) {
   try {
     const body = await req.json()
-    const { phoneNumber, amount } = body
+    const phoneNumber = body.phoneNumber || body.phone || body.msisdn || body.phone_no
+    const amount = body.amount || body.amountToPay || 200
 
-    const consumerKey = process.env.NEXT_PUBLIC_DARAJA_CONSUMER_KEY
-    const consumerSecret = process.env.NEXT_PUBLIC_DARAJA_CONSUMER_SECRET
-    const passkey = process.env.NEXT_PUBLIC_DARAJA_PASSKEY
-    const shortcode = process.env.NEXT_PUBLIC_DARAJA_SHORTCODE || '174379'
-    const callbackUrl = process.env.NEXT_PUBLIC_DARAJA_CALLBACK_URL || (body.callbackUrl || null)
-    const baseUrl = process.env.NEXT_PUBLIC_DARAJA_BASE_URL || 'https://sandbox.safaricom.co.ke'
+    const consumerKey = readEnv('DARAJA_CONSUMER_KEY') || readEnv('MPESA_CONSUMER_KEY')
+    const consumerSecret = readEnv('DARAJA_CONSUMER_SECRET') || readEnv('MPESA_CONSUMER_SECRET')
+    const passkey = readEnv('DARAJA_PASSKEY') || readEnv('MPESA_PASSKEY')
+    const shortcode = readEnv('DARAJA_SHORTCODE') || readEnv('MPESA_SHORTCODE') || '174379'
+    const baseUrl = readEnv('DARAJA_BASE_URL') || 'https://sandbox.safaricom.co.ke'
+    const callbackBaseUrl = readEnv('DARAJA_CALLBACK_URL') || body.callbackUrl || null
 
     if (!passkey || passkey === 'N/A' || !shortcode) {
       console.log('Daraja STK Push (mock) payload:', body)
@@ -33,22 +38,32 @@ export async function POST(req) {
     const token = await getToken(baseUrl, consumerKey, consumerSecret)
     if (!token) {
       console.log('Daraja token not available; returning mock')
-      return NextResponse.json({ status: 'mocked', message: 'Daraja token unavailable', payload: body })
+      return NextResponse.json({ status: 'mocked', message: 'Daraja token unavailable', payload: body, checkoutRequestID: 'MOCK_DARAJA_123' })
     }
 
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14)
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
+
+    let callbackUrl = callbackBaseUrl || `${baseUrl}/api/daraja/callback`
+    try {
+      const callbackUrlObject = new URL(callbackUrl, baseUrl)
+      if (body.userId) callbackUrlObject.searchParams.set('user_id', body.userId)
+      if (body.sessionId) callbackUrlObject.searchParams.set('session_id', body.sessionId)
+      callbackUrl = callbackUrlObject.toString()
+    } catch (e) {
+      console.warn('Failed to attach Daraja callback context', e)
+    }
 
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: amount,
+      Amount: Number(amount),
       PartyA: phoneNumber,
       PartyB: shortcode,
       PhoneNumber: phoneNumber,
-      CallBackURL: callbackUrl || `${baseUrl}/api/daraja/callback`,
+      CallBackURL: callbackUrl,
       AccountReference: body.accountReference || `GEOH${Date.now().toString().slice(-6)}`,
       TransactionDesc: body.description || 'GeoHome - Search Pass'
     }
@@ -60,7 +75,7 @@ export async function POST(req) {
     })
 
     const json = await res.json()
-    return NextResponse.json({ status: 'live', response: json })
+    return NextResponse.json({ status: 'live', response: json, checkoutRequestID: json?.CheckoutRequestID || null })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

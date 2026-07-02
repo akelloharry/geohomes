@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 
+function readEnv(name) {
+  return process.env[name] || process.env[`NEXT_PUBLIC_${name}`] || null
+}
+
 export async function GET() {
   try {
-    const consumerKey = process.env.NEXT_PUBLIC_DARAJA_CONSUMER_KEY
-    const consumerSecret = process.env.NEXT_PUBLIC_DARAJA_CONSUMER_SECRET
-    const baseUrl = process.env.NEXT_PUBLIC_DARAJA_BASE_URL || 'https://sandbox.safaricom.co.ke'
+    const consumerKey = readEnv('DARAJA_CONSUMER_KEY') || readEnv('MPESA_CONSUMER_KEY')
+    const consumerSecret = readEnv('DARAJA_CONSUMER_SECRET') || readEnv('MPESA_CONSUMER_SECRET')
+    const baseUrl = readEnv('DARAJA_BASE_URL') || 'https://sandbox.safaricom.co.ke'
 
     if (!consumerKey || !consumerSecret) {
       return NextResponse.json({ error: 'Daraja credentials not configured' }, { status: 500 })

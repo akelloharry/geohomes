@@ -305,13 +305,23 @@ export default function PropertyDetail({ params }) {
 
   const buySearchPass = async () => {
     if (!user) return alert('Please login to buy a search pass')
-    const res = await fetch('/api/mpesa/stkpush', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: user.user_metadata?.phone || user.email, amount: 200, account: 'search_pass', description: 'GeoHome search pass' }) })
+    const phoneNumber = user.user_metadata?.phone || ''
+    if (!phoneNumber) return alert('Please add a phone number to your profile to pay by M-Pesa.')
+
+    const res = await fetch('/api/daraja/stkpush', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber, amount: 200, accountReference: 'search_pass', description: 'GeoHome search pass', userId: user.id })
+    })
     const json = await res.json()
-    if (json?.status) {
-      const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    if (json?.status === 'mocked') {
+      const expires_at = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString()
       await supabase.from('search_passes').insert({ user_id: user.id, expires_at, paid_amount: 200 })
-      alert('Search pass purchased — valid 7 days')
+      alert('Search pass activated for 4 days')
       setHasPass(true)
+    } else if (json?.status === 'live') {
+      await supabase.from('search_passes').insert({ user_id: user.id, expires_at: null, paid_amount: 200 })
+      alert('M-Pesa prompt sent. Your pass will activate after payment confirmation.')
     } else {
       alert('Payment failed')
     }

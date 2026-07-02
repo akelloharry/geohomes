@@ -19,6 +19,8 @@ export default function MapPage() {
   const [showPassModal, setShowPassModal] = useState(false)
   const [purchasingPass, setPurchasingPass] = useState(false)
   const [sessionId, setSessionId] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [purchaseMessage, setPurchaseMessage] = useState("")
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -29,6 +31,12 @@ export default function MapPage() {
     }
     setSessionId(generatedSessionId)
   }, [])
+
+  useEffect(() => {
+    if (user?.user_metadata?.phone) {
+      setPhoneNumber(String(user.user_metadata.phone))
+    }
+  }, [user?.id, user?.user_metadata?.phone])
 
   useEffect(() => {
     let active = true
@@ -114,37 +122,72 @@ export default function MapPage() {
   }, [sessionId, user?.id, authLoading])
 
   const purchasePass = async () => {
+    const normalizedPhone = phoneNumber.replace(/\D/g, '')
+    if (!normalizedPhone) {
+      setError('Please enter your M-Pesa phone number to continue.')
+      return
+    }
+
     setPurchasingPass(true)
+    setError('')
+    setPurchaseMessage('')
+
     try {
       const durationDays = user ? 4 : 3
       const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
       const payload = {
-        expires_at: expiresAt,
+        expires_at: null,
         paid_amount: 200,
         ...(sessionId ? { session_id: sessionId } : {}),
         ...(user?.id ? { user_id: user.id } : {})
       }
 
-      const { error } = await supabase.from('search_passes').insert(payload)
-      if (error) {
-        if (error.message?.includes('session_id') || error.message?.includes('column')) {
+      const { error: insertError } = await supabase.from('search_passes').insert(payload)
+      if (insertError) {
+        if (insertError.message?.includes('session_id') || insertError.message?.includes('column')) {
           const fallbackPayload = {
-            expires_at: expiresAt,
+            expires_at: null,
             paid_amount: 200,
             ...(user?.id ? { user_id: user.id } : {})
           }
           const { error: fallbackError } = await supabase.from('search_passes').insert(fallbackPayload)
           if (fallbackError) throw fallbackError
         } else {
-          throw error
+          throw insertError
         }
       }
 
-      setHasPass(true)
+      const res = await fetch('/api/daraja/stkpush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: normalizedPhone,
+          amount: 200,
+          accountReference: `GEOH${Date.now().toString().slice(-6)}`,
+          description: 'GeoHome search pass',
+          userId: user?.id || null,
+          sessionId
+        })
+      })
+
+      const json = await res.json()
+      if (!res.ok || json?.error) {
+        throw new Error(json?.error || 'Unable to start payment.')
+      }
+
+      if (json?.status === 'mocked') {
+        const { error: activationError } = await supabase.from('search_passes').update({ expires_at: expiresAt, paid_amount: 200 }).eq('session_id', sessionId)
+        if (activationError) throw activationError
+        setHasPass(true)
+        setPurchaseMessage('Mock payment completed. Your pass is active.')
+      } else {
+        setPurchaseMessage('Payment request sent. Please approve the M-Pesa prompt on your phone.')
+      }
+
       setShowPassModal(false)
     } catch (err) {
       console.error('Pass purchase error', err)
-      setError('Unable to activate your pass right now. Please try again.')
+      setError('Unable to start your pass purchase right now. Please try again.')
     } finally {
       setPurchasingPass(false)
     }
@@ -220,6 +263,23 @@ export default function MapPage() {
             <span className="text-slate-600">Pass duration</span>
             <span className="font-semibold text-slate-900">{user ? '4 days' : '3 days'}</span>
           </div>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">M-Pesa phone number</label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="254700000000"
+              className="w-full rounded-[16px] border border-slate-200 px-4 py-3 text-sm outline-none focus:border-official-teal"
+            />
+          </div>
+
+          {purchaseMessage ? (
+            <div className="mt-4 rounded-[16px] border border-official-teal/20 bg-mint-hint p-3 text-sm text-official-teal">
+              {purchaseMessage}
+            </div>
+          ) : null}
 
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={() => setShowPassModal(false)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
