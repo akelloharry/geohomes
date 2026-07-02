@@ -140,12 +140,29 @@ ALTER TABLE agent_submissions ADD COLUMN IF NOT EXISTS property_id uuid;
 CREATE TABLE IF NOT EXISTS search_passes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid,
+  session_id text,
   purchased_at timestamptz DEFAULT now(),
   expires_at timestamptz,
   paid_amount integer
 );
 
 ALTER TABLE search_passes ADD COLUMN IF NOT EXISTS paid_amount integer;
+ALTER TABLE search_passes ADD COLUMN IF NOT EXISTS session_id text;
+
+CREATE OR REPLACE FUNCTION has_active_pass(user_id_param uuid, session_id_param text)
+RETURNS boolean
+LANGUAGE sql
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM search_passes sp
+    WHERE sp.expires_at > now()
+      AND (
+        (user_id_param IS NOT NULL AND sp.user_id = user_id_param)
+        OR (session_id_param IS NOT NULL AND sp.session_id = session_id_param)
+      )
+  );
+$$;
 
 -- RPC: nearby_properties(lat_param, lng_param, radius)
 CREATE OR REPLACE FUNCTION nearby_properties(lat_param double precision, lng_param double precision, radius integer)

@@ -11,11 +11,13 @@ if (!mapboxToken) {
 
 mapboxgl.accessToken = mapboxToken || ''
 
-export default function Map({ center = [34.7617, -0.0917], properties = [], zoom = 13, className = '', onMarkerClick, onPinMove, draggable = false, pinLocation }) {
+export default function Map({ center = [34.7617, -0.0917], properties = [], zoom = 13, className = '', onMarkerClick, onPinMove, draggable = false, pinLocation, hasPass = false, onRequestPass }) {
   const mapContainer = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
   const pinRef = useRef(null)
+  const effectiveZoom = hasPass ? zoom : Math.min(zoom, 12)
+  const maxZoom = hasPass ? 18 : 12
 
   if (!mapboxToken) {
     return (
@@ -32,7 +34,8 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center,
-      zoom,
+      zoom: effectiveZoom,
+      maxZoom,
       attributionControl: false
     })
 
@@ -42,18 +45,19 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
       trackUserLocation: true,
       showUserHeading: true
     }), 'top-right')
-  }, [center, zoom])
+  }, [center, effectiveZoom, maxZoom])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
     try {
+      map.setMaxZoom(maxZoom)
       if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
         map.once('load', () => {
           try {
             map.setCenter(center)
-            map.setZoom(zoom)
+            map.setZoom(effectiveZoom)
           } catch (error) {
             console.warn('map.setCenter failed after load', error)
           }
@@ -61,7 +65,7 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
       } else {
         try {
           map.setCenter(center)
-          map.setZoom(zoom)
+          map.setZoom(effectiveZoom)
         } catch (error) {
           console.warn('map.setCenter failed', error)
         }
@@ -73,18 +77,13 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    console.log("Map component rendering properties:", properties.length)
-
     properties.forEach((property, index) => {
       const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : null)
       const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : null)
-      
+
       if (lat == null || lng == null) {
-        console.warn(`Property ${index} missing coordinates:`, { id: property.id, lat, lng })
         return
       }
-      
-      console.log(`Adding marker for property ${index}:`, { id: property.id, lat, lng, available: property.available })
 
       const markerElement = document.createElement('div')
       markerElement.className = 'marker'
@@ -99,21 +98,30 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
       markerElement.style.background = color
 
       const marker = new mapboxgl.Marker(markerElement).setLngLat([lng, lat]).addTo(map)
-
-      const title = property.title || 'Property'
+      const title = hasPass ? (property.title || 'Property') : 'Property Available'
       const address = property.address || ''
       const price = property.price != null ? `KES ${property.price}` : ''
-      const bedrooms = property.bedrooms != null ? `${property.bedrooms} bd` : ''
-      const bathrooms = property.bathrooms != null ? `${property.bathrooms} ba` : ''
       const propertyType = property.property_type || property.type || ''
-      const details = [address, price, bedrooms, bathrooms, propertyType].filter(Boolean).join(' • ')
+      const details = [address, price, propertyType].filter(Boolean).join(' • ')
       const popupHtml = `
         <div style="font-size:13px;line-height:1.5;max-width:240px;color:#1E3A4D;">
           <strong style="display:block;margin-bottom:6px;font-family:Merriweather,serif;color:#2C6E5C;">${title}</strong>
           <div style="margin-bottom:8px;">${details}</div>
-          <a href="/properties/${property.id}" style="color:#2C6E5C;text-decoration:none;font-weight:700;">View details</a>
+          ${hasPass ? `<a href="/properties/${property.id}" style="color:#2C6E5C;text-decoration:none;font-weight:700;">View details</a>` : `<button type="button" class="map-pass-cta" style="background:#2C6E5C;color:#fff;border:none;border-radius:999px;padding:8px 12px;font-weight:600;cursor:pointer;">Buy Pass to View Details</button>`}
         </div>`
-      marker.setPopup(new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(popupHtml))
+      const popup = new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(popupHtml)
+      marker.setPopup(popup)
+
+      popup.on('open', () => {
+        const cta = popup.getElement()?.querySelector('.map-pass-cta')
+        if (cta) {
+          cta.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onRequestPass?.()
+          })
+        }
+      })
 
       if (onMarkerClick) {
         markerElement.addEventListener('click', () => onMarkerClick(property))
@@ -121,8 +129,6 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
 
       markersRef.current.push(marker)
     })
-
-    console.log(`✅ Completed rendering ${markersRef.current.length} markers`)
 
     if (pinLocation) {
       if (pinRef.current) {
@@ -154,7 +160,7 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], zoom
         map.off('click', handleMapClick)
       }
     }
-  }, [center, properties, zoom, pinLocation, draggable, onPinMove, onMarkerClick])
+  }, [center, properties, effectiveZoom, maxZoom, pinLocation, draggable, onPinMove, onMarkerClick, hasPass, onRequestPass])
 
   return <div ref={mapContainer} className={`h-96 w-full rounded-[24px] ${className}`.trim()} />
 }
