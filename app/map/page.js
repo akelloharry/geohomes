@@ -133,30 +133,6 @@ export default function MapPage() {
     setPurchaseMessage('')
 
     try {
-      const durationDays = user ? 4 : 3
-      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
-      const payload = {
-        expires_at: null,
-        paid_amount: 200,
-        ...(sessionId ? { session_id: sessionId } : {}),
-        ...(user?.id ? { user_id: user.id } : {})
-      }
-
-      const { error: insertError } = await supabase.from('search_passes').insert(payload)
-      if (insertError) {
-        if (insertError.message?.includes('session_id') || insertError.message?.includes('column')) {
-          const fallbackPayload = {
-            expires_at: null,
-            paid_amount: 200,
-            ...(user?.id ? { user_id: user.id } : {})
-          }
-          const { error: fallbackError } = await supabase.from('search_passes').insert(fallbackPayload)
-          if (fallbackError) throw fallbackError
-        } else {
-          throw insertError
-        }
-      }
-
       const res = await fetch('/api/daraja/stkpush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,8 +152,6 @@ export default function MapPage() {
       }
 
       if (json?.status === 'mocked') {
-        const { error: activationError } = await supabase.from('search_passes').update({ expires_at: expiresAt, paid_amount: 200 }).eq('session_id', sessionId)
-        if (activationError) throw activationError
         setHasPass(true)
         setPurchaseMessage('Mock payment completed. Your pass is active.')
       } else {

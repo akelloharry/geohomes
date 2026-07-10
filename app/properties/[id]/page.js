@@ -315,12 +315,9 @@ export default function PropertyDetail({ params }) {
     })
     const json = await res.json()
     if (json?.status === 'mocked') {
-      const expires_at = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString()
-      await supabase.from('search_passes').insert({ user_id: user.id, expires_at, paid_amount: 200 })
       alert('Search pass activated for 4 days')
       setHasPass(true)
     } else if (json?.status === 'live') {
-      await supabase.from('search_passes').insert({ user_id: user.id, expires_at: null, paid_amount: 200 })
       alert('M-Pesa prompt sent. Your pass will activate after payment confirmation.')
     } else {
       alert('Payment failed')

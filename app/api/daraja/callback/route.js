@@ -1,24 +1,26 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 
 async function findMatchingPass(userId, sessionId, phoneNumber) {
   if (userId) {
-    const { data } = await supabase.from('search_passes').select('*').eq('user_id', userId).order('purchased_at', { ascending: false }).limit(5)
+    const { data } = await supabaseAdmin.from('search_passes').select('*').eq('user_id', userId).order('purchased_at', { ascending: false }).limit(5)
     const match = (data || []).find((item) => !item.expires_at || new Date(item.expires_at) <= new Date()) || (data || [])[0]
     if (match) return match
   }
 
   if (sessionId) {
-    const { data } = await supabase.from('search_passes').select('*').eq('session_id', sessionId).order('purchased_at', { ascending: false }).limit(5)
+    const { data } = await supabaseAdmin.from('search_passes').select('*').eq('session_id', sessionId).order('purchased_at', { ascending: false }).limit(5)
     const match = (data || []).find((item) => !item.expires_at || new Date(item.expires_at) <= new Date()) || (data || [])[0]
     if (match) return match
   }
 
   if (phoneNumber) {
     try {
-      const { data: profile } = await supabase.from('profiles').select('id').eq('phone', phoneNumber).maybeSingle()
+      const { data: profile } = await supabaseAdmin.from('profiles').select('id').eq('phone', phoneNumber).maybeSingle()
       if (profile?.id) {
-        const { data } = await supabase.from('search_passes').select('*').eq('user_id', profile.id).order('purchased_at', { ascending: false }).limit(5)
+        const { data } = await supabaseAdmin.from('search_passes').select('*').eq('user_id', profile.id).order('purchased_at', { ascending: false }).limit(5)
         const match = (data || []).find((item) => !item.expires_at || new Date(item.expires_at) <= new Date()) || (data || [])[0]
         if (match) return match
       }
@@ -62,10 +64,10 @@ export async function POST(request) {
       try {
         const existingPass = await findMatchingPass(userId, sessionId, phoneNumber)
         if (existingPass?.id) {
-          const { error } = await supabase.from('search_passes').update(updatePayload).eq('id', existingPass.id)
+          const { error } = await supabaseAdmin.from('search_passes').update(updatePayload).eq('id', existingPass.id)
           if (error) console.warn('Failed to update search_passes row', error)
         } else {
-          const { error } = await supabase.from('search_passes').insert(updatePayload)
+          const { error } = await supabaseAdmin.from('search_passes').insert(updatePayload)
           if (error) console.warn('Failed to insert search_passes row', error)
         }
       } catch (e) {
