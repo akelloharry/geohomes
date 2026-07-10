@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+const supabaseAdmin = createClient(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const BYPASS_PAYMENT = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true'
 
 function readEnv(name) {
@@ -28,8 +28,11 @@ export async function POST(req) {
     const amount = body.amount || body.amountToPay || 200
 
     if (BYPASS_PAYMENT) {
-      console.log('🔓 Bypass mode enabled – creating pass without payment')
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('� BYPASS_PAYMENT value:', process.env.NEXT_PUBLIC_BYPASS_PAYMENT)
+    console.log('🔍 Supabase URL configured:', Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
+    console.log('🔍 Supabase service key configured:', Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY))
+    console.log('🔓 Bypass mode enabled – creating pass without payment')
+      if (!(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
         return NextResponse.json({ error: 'Service role not configured for bypass mode' }, { status: 500 })
       }
 
