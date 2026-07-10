@@ -151,9 +151,9 @@ export default function MapPage() {
         throw new Error(json?.error || 'Unable to start payment.')
       }
 
-      if (json?.status === 'mocked') {
+      if (json?.status === 'mocked' || json?.status === 'bypassed') {
         setHasPass(true)
-        setPurchaseMessage('Mock payment completed. Your pass is active.')
+        setPurchaseMessage(json?.status === 'bypassed' ? 'Bypass mode enabled: your pass is active.' : 'Mock payment completed. Your pass is active.')
       } else {
         setPurchaseMessage('Payment request sent. Please approve the M-Pesa prompt on your phone.')
       }
@@ -248,6 +248,12 @@ export default function MapPage() {
               className="w-full rounded-[16px] border border-slate-200 px-4 py-3 text-sm outline-none focus:border-official-teal"
             />
           </div>
+
+          {process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true' ? (
+            <div className="mt-4 rounded-[16px] border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+              🔓 Bypass mode active – passes are created instantly without payment.
+            </div>
+          ) : null}
 
           {purchaseMessage ? (
             <div className="mt-4 rounded-[16px] border border-official-teal/20 bg-mint-hint p-3 text-sm text-official-teal">

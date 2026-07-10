@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+const BYPASS_PAYMENT = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true'
 
 function readEnv(name) {
   return process.env[name] || process.env[`NEXT_PUBLIC_${name}`] || null
@@ -22,6 +26,44 @@ export async function POST(req) {
     const body = await req.json()
     const phoneNumber = body.phoneNumber || body.phone || body.msisdn || body.phone_no
     const amount = body.amount || body.amountToPay || 200
+
+    if (BYPASS_PAYMENT) {
+      console.log('🔓 Bypass mode enabled – creating pass without payment')
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return NextResponse.json({ error: 'Service role not configured for bypass mode' }, { status: 500 })
+      }
+
+      const durationDays = body.userId ? 4 : 3
+      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+      const { data: pass, error: insertError } = await supabaseAdmin
+        .from('search_passes')
+        .insert({
+          user_id: body.userId || null,
+          session_id: body.sessionId || null,
+          purchased_at: new Date().toISOString(),
+          expires_at: expiresAt,
+          paid_amount: Number(amount)
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('Bypass insert error:', insertError)
+        return NextResponse.json({ error: 'Failed to create pass' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: 'bypassed',
+        bypass: true,
+        data: {
+          MerchantRequestID: `BYPASS-${Date.now()}`,
+          CheckoutRequestID: `BYPASS-${Date.now()}`,
+          ResponseDescription: 'Bypass mode – pass created successfully',
+          pass
+        }
+      })
+    }
 
     const consumerKey = readEnv('DARAJA_CONSUMER_KEY') || readEnv('MPESA_CONSUMER_KEY')
     const consumerSecret = readEnv('DARAJA_CONSUMER_SECRET') || readEnv('MPESA_CONSUMER_SECRET')

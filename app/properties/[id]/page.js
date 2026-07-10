@@ -314,7 +314,7 @@ export default function PropertyDetail({ params }) {
       body: JSON.stringify({ phoneNumber, amount: 200, accountReference: 'search_pass', description: 'GeoHome search pass', userId: user.id })
     })
     const json = await res.json()
-    if (json?.status === 'mocked') {
+    if (json?.status === 'mocked' || json?.status === 'bypassed') {
       alert('Search pass activated for 4 days')
       setHasPass(true)
     } else if (json?.status === 'live') {
