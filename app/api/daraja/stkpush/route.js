@@ -45,27 +45,26 @@ export async function POST(req) {
       let insertError = null
       const insertPayloads = [
         {
-          tenant_id: body.userId || null,
-          user_id: body.userId || null,
-          session_id: body.sessionId || null,
-          purchased_at: new Date().toISOString(),
-          expires_at: expiresAt,
-          paid_amount: Number(amount)
-        },
-        {
+          tenant_id: body.userId || 'guest',
           user_id: body.userId || null,
           session_id: body.sessionId || null,
           expires_at: expiresAt,
           paid_amount: Number(amount)
         },
         {
-          user_id: body.userId || null,
+          tenant_id: body.userId || 'guest',
+          session_id: body.sessionId || null,
+          expires_at: expiresAt,
+          paid_amount: Number(amount)
+        },
+        {
+          tenant_id: body.userId || 'guest',
           session_id: body.sessionId || null,
           expires_at: expiresAt
         },
         {
-          session_id: body.sessionId || null,
-          expires_at: expiresAt
+          tenant_id: body.userId || 'guest',
+          session_id: body.sessionId || null
         }
       ]
 

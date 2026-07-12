@@ -56,7 +56,6 @@ export async function POST(request) {
       const updatePayload = {
         user_id: userId,
         session_id: sessionId,
-        purchased_at: new Date().toISOString(),
         expires_at: expiresAt,
         paid_amount: amount || 200
       }
@@ -70,17 +69,20 @@ export async function POST(request) {
           const payloadVariants = [
             updatePayload,
             {
+              tenant_id: userId || 'guest',
               user_id: userId,
               session_id: sessionId,
               expires_at: expiresAt,
               paid_amount: amount || 200
             },
             {
+              tenant_id: userId || 'guest',
               session_id: sessionId,
               expires_at: expiresAt,
               paid_amount: amount || 200
             },
             {
+              tenant_id: userId || 'guest',
               session_id: sessionId,
               expires_at: expiresAt
             }
