@@ -8,10 +8,12 @@ import { Filters } from '../../components/Search/Filters'
 import { ResultsList } from '../../components/Results/ResultsList'
 import { BuyPassModal } from '../../components/BuyPassModal'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '../../context/AuthContext'
 
 const kisumuCenter = [34.7617, -0.0917]
 
 export default function FullMapPage() {
+  const { user } = useAuth()
   const [map, setMap] = useState(null)
   const [hasPass, setHasPass] = useState(false)
   const [sessionId, setSessionId] = useState('')
@@ -155,6 +157,7 @@ export default function FullMapPage() {
         isOpen={showPassModal}
         onClose={() => setShowPassModal(false)}
         onSuccess={refreshPassStatus}
+        userId={user?.id || null}
       />
     </div>
   )

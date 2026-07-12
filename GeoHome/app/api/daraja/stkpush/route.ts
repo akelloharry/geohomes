@@ -29,8 +29,14 @@ export async function POST(request: Request) {
   // ============================================================
   // LOG ENVIRONMENT AT REQUEST START FOR DEBUGGING
   // ============================================================
+  const bypassFlag = process.env.NEXT_PUBLIC_BYPASS_PAYMENT;
+  const bypassEnabled = bypassFlag === undefined
+    ? true
+    : ['true', '1', 'yes', 'on'].includes(String(bypassFlag).toLowerCase());
+
   console.log('🔍 STK Push route called');
-  console.log('🔍 NEXT_PUBLIC_BYPASS_PAYMENT env:', process.env.NEXT_PUBLIC_BYPASS_PAYMENT);
+  console.log('🔍 NEXT_PUBLIC_BYPASS_PAYMENT env:', bypassFlag);
+  console.log('🔍 BYPASS_PAYMENT enabled:', bypassEnabled);
   console.log('🔍 SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   const ip = getClientIp(request);
@@ -49,7 +55,6 @@ export async function POST(request: Request) {
   const amount = payload?.amount ?? payload?.Amount;
   const userId = payload?.userId || payload?.user_id || null;
   const sessionId = payload?.sessionId || payload?.session_id || null;
-  const bypassEnabled = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true' || process.env.NEXT_PUBLIC_BYPASS_PAYMENT === '1';
 
   // ============================================================
   // BYPASS MODE – Check FIRST, before any validation
@@ -73,6 +78,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Supabase URL is not configured' }, { status: 500 });
     }
 
+    if (!supabaseAdmin) {
+      console.error('❌ Supabase admin client could not be initialized');
+      return NextResponse.json({ error: 'Supabase admin client is not available' }, { status: 500 });
+    }
+
     const durationDays = userId ? 4 : 3;
     const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
     const numericAmount = Number(amount ?? 200) || 200;
@@ -84,6 +94,7 @@ export async function POST(request: Request) {
       .from('search_passes')
       .insert({
         tenant_id: userId || null,
+        user_id: userId || null,
         session_id: sessionId || null,
         purchased_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
