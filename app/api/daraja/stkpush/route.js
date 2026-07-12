@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
-const BYPASS_PAYMENT = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true'
+const bypassFlag = process.env.NEXT_PUBLIC_BYPASS_PAYMENT
+const BYPASS_PAYMENT = bypassFlag === undefined ? true : ['true', '1', 'yes', 'on'].includes(String(bypassFlag).toLowerCase())
 
 function readEnv(name) {
   return process.env[name] || process.env[`NEXT_PUBLIC_${name}`] || null
@@ -28,10 +29,11 @@ export async function POST(req) {
     const amount = body.amount || body.amountToPay || 200
 
     if (BYPASS_PAYMENT) {
-      console.log('� BYPASS_PAYMENT value:', process.env.NEXT_PUBLIC_BYPASS_PAYMENT)
-    console.log('🔍 Supabase URL configured:', Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
-    console.log('🔍 Supabase service key configured:', Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY))
-    console.log('🔓 Bypass mode enabled – creating pass without payment')
+      console.log('🔍 BYPASS_PAYMENT value:', bypassFlag)
+      console.log('🔍 BYPASS_PAYMENT enabled:', BYPASS_PAYMENT)
+      console.log('🔍 Supabase URL configured:', Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
+      console.log('🔍 Supabase service key configured:', Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY))
+      console.log('🔓 Bypass mode enabled – creating pass without payment')
       if (!(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
         return NextResponse.json({ error: 'Service role not configured for bypass mode' }, { status: 500 })
       }
@@ -41,11 +43,13 @@ export async function POST(req) {
       const { data: pass, error: insertError } = await supabaseAdmin
         .from('search_passes')
         .insert({
+          tenant_id: body.userId || null,
           user_id: body.userId || null,
           session_id: body.sessionId || null,
           purchased_at: new Date().toISOString(),
           expires_at: expiresAt,
-          paid_amount: Number(amount)
+          paid_amount: Number(amount),
+          payment_ref: `BYPASS-${Date.now()}`
         })
         .select()
         .single()
