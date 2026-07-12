@@ -21,6 +21,7 @@ export default function MapPage() {
   const [sessionId, setSessionId] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [purchaseMessage, setPurchaseMessage] = useState("")
+  const [modalError, setModalError] = useState("")
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -124,12 +125,12 @@ export default function MapPage() {
   const purchasePass = async () => {
     const normalizedPhone = phoneNumber.replace(/\D/g, '')
     if (!normalizedPhone) {
-      setError('Please enter your M-Pesa phone number to continue.')
+      setModalError('Please enter your M-Pesa phone number to continue.')
       return
     }
 
     setPurchasingPass(true)
-    setError('')
+    setModalError('')
     setPurchaseMessage('')
 
     try {
@@ -161,7 +162,7 @@ export default function MapPage() {
       setShowPassModal(false)
     } catch (err) {
       console.error('Pass purchase error', err)
-      setError('Unable to start your pass purchase right now. Please try again.')
+      setModalError(err?.message || 'Unable to start your pass purchase right now. Please try again.')
     } finally {
       setPurchasingPass(false)
     }
@@ -252,6 +253,12 @@ export default function MapPage() {
           {process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true' ? (
             <div className="mt-4 rounded-[16px] border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
               🔓 Bypass mode active – passes are created instantly without payment.
+            </div>
+          ) : null}
+
+          {modalError ? (
+            <div className="mt-4 rounded-[16px] border border-estate-red/20 bg-estate-red/10 p-3 text-sm text-estate-red">
+              {modalError}
             </div>
           ) : null}
 
