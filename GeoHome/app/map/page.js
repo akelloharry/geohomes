@@ -6,6 +6,7 @@ import Map from '../../components/Map'
 import { SearchBar } from '../../components/Search/SearchBar'
 import { Filters } from '../../components/Search/Filters'
 import { ResultsList } from '../../components/Results/ResultsList'
+import { BuyPassModal } from '../../components/BuyPassModal'
 import { supabase } from '../../lib/supabaseClient'
 
 const kisumuCenter = [34.7617, -0.0917]
@@ -15,6 +16,7 @@ export default function FullMapPage() {
   const [hasPass, setHasPass] = useState(false)
   const [sessionId, setSessionId] = useState('')
   const [checkingPass, setCheckingPass] = useState(true)
+  const [showPassModal, setShowPassModal] = useState(false)
 
   // Initialize session
   useEffect(() => {
@@ -67,6 +69,33 @@ export default function FullMapPage() {
     }
   }
 
+  const refreshPassStatus = async () => {
+    if (!sessionId) return
+    setCheckingPass(true)
+    try {
+      const { data, error } = await supabase.rpc('has_active_pass', {
+        user_id: null,
+        session_id: sessionId,
+      })
+      if (error) {
+        console.warn('Pass check failed:', error)
+        setHasPass(false)
+      } else {
+        setHasPass(Boolean(data))
+      }
+    } catch (err) {
+      console.warn('Pass check exception:', err)
+      setHasPass(false)
+    } finally {
+      setCheckingPass(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!sessionId) return
+    refreshPassStatus()
+  }, [sessionId])
+
   return (
     <div className="relative h-screen w-full flex overflow-hidden bg-[#F9FAFB]">
       {/* Map Background */}
@@ -114,6 +143,19 @@ export default function FullMapPage() {
           </p>
         </div>
       </div>
+
+      <button
+        onClick={() => setShowPassModal(true)}
+        className="fixed bottom-4 right-4 z-40 rounded-full bg-[#2C6E5C] px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-[#245b4c]"
+      >
+        {hasPass ? 'Pass active' : 'Buy Pass'}
+      </button>
+
+      <BuyPassModal
+        isOpen={showPassModal}
+        onClose={() => setShowPassModal(false)}
+        onSuccess={refreshPassStatus}
+      />
     </div>
   )
 }

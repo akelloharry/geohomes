@@ -49,12 +49,12 @@ export async function POST(request: Request) {
   const amount = payload?.amount ?? payload?.Amount;
   const userId = payload?.userId || payload?.user_id || null;
   const sessionId = payload?.sessionId || payload?.session_id || null;
+  const bypassEnabled = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true' || process.env.NEXT_PUBLIC_BYPASS_PAYMENT === '1';
 
   // ============================================================
   // BYPASS MODE – Check FIRST, before any validation
   // ============================================================
-  const isBypassEnabled = process.env.NEXT_PUBLIC_BYPASS_PAYMENT === 'true';
-  if (isBypassEnabled) {
+  if (bypassEnabled) {
     console.log('🔓 Bypass mode ENABLED – creating pass without payment');
     console.log('📦 Request details:', {
       userId,
@@ -66,6 +66,11 @@ export async function POST(request: Request) {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error('❌ Bypass mode enabled but SUPABASE_SERVICE_ROLE_KEY is not configured');
       return NextResponse.json({ error: 'Supabase service role is not configured' }, { status: 500 });
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_URL) {
+      console.error('❌ Bypass mode enabled but Supabase URL is not configured');
+      return NextResponse.json({ error: 'Supabase URL is not configured' }, { status: 500 });
     }
 
     const durationDays = userId ? 4 : 3;
