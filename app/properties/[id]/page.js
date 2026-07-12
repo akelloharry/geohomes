@@ -41,6 +41,7 @@ export default function PropertyDetail({ params }) {
   const [landlord, setLandlord] = useState(null)
   const [locationPath, setLocationPath] = useState('')
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [hasPass, setHasPass] = useState(false)
   const [loadingPass, setLoadingPass] = useState(false)
   const [requesting, setRequesting] = useState(false)
@@ -85,7 +86,7 @@ export default function PropertyDetail({ params }) {
 
   async function fetchProperty() {
     try {
-      const { data, error } = await supabase.from('properties').select('*').eq('id', id).eq('verification_status', 'verified').single()
+      const { data, error } = await supabase.from('properties').select('*').eq('id', id).maybeSingle()
       if (error || !data) {
         setError('Property not found or unavailable.')
         setProperty(null)
@@ -93,8 +94,8 @@ export default function PropertyDetail({ params }) {
       }
 
       setProperty(data)
-      setError('')
       setLocationPath('')
+      setError(data.verification_status === 'verified' ? '' : 'This listing is not verified yet.')
 
       try {
         const { data: pathData, error: pathError } = await supabase.rpc('get_property_location_path', { property_id: id })
