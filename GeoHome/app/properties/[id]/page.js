@@ -1,288 +1,312 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import PropertyCard from '../../../components/PropertyCard'
-import Map from '../../../components/Map'
-import AvailabilityCalendar from '../../../components/AvailabilityCalendar'
 import { useAuth } from '../../../context/AuthContext'
+import PropertyHeader from '../../../components/PropertyDetail/PropertyHeader'
+import CoverPhoto from '../../../components/PropertyDetail/CoverPhoto'
+import Description from '../../../components/PropertyDetail/Description'
+import Amenities from '../../../components/PropertyDetail/Amenities'
+import UnitsList from '../../../components/PropertyDetail/UnitsList'
+import MiniMap from '../../../components/PropertyDetail/MiniMap'
+import LandlordCard from '../../../components/PropertyDetail/LandlordCard'
+import ContactModal from '../../../components/PropertyDetail/ContactModal'
+import ActionButtons from '../../../components/PropertyDetail/ActionButtons'
+
+function normalizePhotos(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean)
+  return []
+}
+
+function normalizeAmenities(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean)
+  return []
+}
+
+function formatCurrency(value) {
+  return `KES ${Number(value || 0).toLocaleString()}`
+}
 
 export default function PropertyDetail({ params }) {
   const { id } = params
   const router = useRouter()
+  const { user, profile } = useAuth()
   const [property, setProperty] = useState(null)
   const [units, setUnits] = useState([])
-  const [owner, setOwner] = useState(null)
-  const { user, profile } = useAuth()
+  const [landlord, setLandlord] = useState(null)
+  const [locationPath, setLocationPath] = useState('')
+  const [error, setError] = useState('')
   const [hasPass, setHasPass] = useState(false)
-  const [requesting, setRequesting] = useState(false)
   const [loadingPass, setLoadingPass] = useState(false)
-  const [thread, setThread] = useState(null)
-  const [bookedDates, setBookedDates] = useState([])
+  const [requesting, setRequesting] = useState(false)
+  const [showContact, setShowContact] = useState(false)
+  const [contactMessage, setContactMessage] = useState('')
+  const [submittingContact, setSubmittingContact] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [activePhoto, setActivePhoto] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
-  useEffect(() => { fetchProperty() }, [id])
+  const photos = normalizePhotos(property?.photos)
+  const amenities = normalizeAmenities(property?.amenities || property?.amenity_tags || property?.features)
+  const description = property?.description || property?.details || ''
+  const price = property?.price || property?.rent_price || 0
+  const deposit = property?.deposit || property?.deposit_amount || 0
+  const coordinates = useMemo(() => {
+    const lng = property?.lng ?? property?.longitude ?? property?.location?.coordinates?.[0] ?? 34.7617
+    const lat = property?.lat ?? property?.latitude ?? property?.location?.coordinates?.[1] ?? -0.0917
+    return [lng, lat]
+  }, [property])
+
+  useEffect(() => {
+    if (!id) return
+    fetchProperty()
+  }, [id])
+
   useEffect(() => {
     if (!user) return
     fetchSearchPass()
-    fetchThread()
   }, [user, profile, id])
-  useEffect(() => {
-    if (!property) return
-    // Combine property-level booked dates and unit-level booked dates
-    const propDates = property.booked_dates || property.unavailable_dates || []
-    const unitDates = (units || []).flatMap((u) => u.booked_dates || [])
-    const all = Array.from(new Set([...(propDates || []), ...(unitDates || [])].map((d) => (d ? (new Date(d).toISOString().slice(0,10)) : null)).filter(Boolean)))
-    setBookedDates(all)
-  }, [property, units])
-
-  async function fetchProperty() {
-    const { data } = await supabase.from('properties').select('*').eq('id', id).single()
-    setProperty(data)
-    if (data?.landlord_id) {
-      const { data: ownerProfile } = await supabase.from('profiles').select('*').eq('id', data.landlord_id).single()
-      setOwner(ownerProfile)
-    }
-    const { data: unitData } = await supabase.from('units').select('*').eq('property_id', id).order('name', { ascending: true })
-    setUnits(unitData || [])
-  }
 
   useEffect(() => {
-    // Record a view for analytics when the property is loaded
-    if (!property) return
-    ;(async () => {
-      try {
-        await supabase.from('property_views').insert({ property_id: property.id, user_id: user?.id || null })
-      } catch (err) {
-        console.error('Failed to record property view', err)
-      }
-    })()
+    if (!property || !user) return
+    supabase.from('property_views').insert({ property_id: property.id, user_id: user.id }).catch(() => null)
   }, [property, user])
 
-  async function fetchThread(unitId = null) {
-    if (!user) return null
-    const baseQuery = supabase.from('chat_threads').select('*')
-      .eq('property_id', id)
-      .eq('tenant_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (unitId) baseQuery.eq('unit_id', unitId)
-
-    const { data, error } = await baseQuery.limit(1)
-    if (error) {
-      console.error(error)
-      setThread(null)
-      return null
+  useEffect(() => {
+    if (photos.length && !activePhoto) {
+      setActivePhoto(photos[0])
     }
-    const foundThread = (data || [])[0] || null
-    setThread(foundThread)
-    return foundThread
+  }, [photos, activePhoto])
+
+  async function fetchProperty() {
+    try {
+      const { data, error } = await supabase.from('properties').select('*').eq('id', id).eq('verification_status', 'verified').maybeSingle()
+      if (error || !data) {
+        setError('Property not found or unavailable.')
+        setProperty(null)
+        return
+      }
+
+      setProperty(data)
+      setError('')
+      setLocationPath('')
+
+      try {
+        const { data: pathData, error: pathError } = await supabase.rpc('get_property_location_path', { property_id: id })
+        if (!pathError && typeof pathData === 'string') {
+          setLocationPath(pathData)
+        }
+      } catch {
+        // ignore location path errors
+      }
+
+      if (data.landlord_id) {
+        const { data: owner } = await supabase.from('profiles').select('full_name, phone, role').eq('id', data.landlord_id).maybeSingle()
+        setLandlord(owner || null)
+      }
+
+      const { data: unitRows } = await supabase.from('units').select('*').eq('property_id', id).order('name', { ascending: true })
+      setUnits(unitRows || [])
+    } catch (err) {
+      console.error(err)
+      setError('Unable to load property details.')
+    }
   }
 
   async function fetchSearchPass() {
-    if (!user) return
     setLoadingPass(true)
-    const { data } = await supabase.from('search_passes').select('*').eq('user_id', user.id).gt('expires_at', new Date().toISOString()).order('expires_at', { ascending: false }).limit(1)
-    setHasPass((data || []).length > 0)
+    try {
+      const { data } = await supabase.from('search_passes').select('*').eq('user_id', user.id).order('expires_at', { ascending: false })
+      const active = (data || []).some((pass) => new Date(pass.expires_at) > new Date())
+      setHasPass(active)
+    } catch (err) {
+      console.warn(err)
+      setHasPass(false)
+    }
     setLoadingPass(false)
   }
 
-  const buySearchPass = async () => {
-    if (!user || (profile?.role || user?.user_metadata?.role) !== 'tenant') return alert('Only tenant accounts may buy a search pass.')
-    const res = await fetch('/api/mpesa/stkpush', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: user.user_metadata?.phone || user.email, amount: 200, account: 'search_pass', description: 'GeoHome search pass' }) })
-    const json = await res.json()
-    if (json?.status) {
-      const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      await supabase.from('search_passes').insert({ user_id: user.id, expires_at, paid_amount: 200 })
-      alert('Search pass purchased — valid 7 days')
-      setHasPass(true)
-    } else {
-      alert('Payment failed')
-    }
-  }
+  const handleBuyPass = async () => {
+    if (!user) return alert('Please log in to purchase a search pass.')
+    const phoneNumber = user.user_metadata?.phone || ''
+    if (!phoneNumber) return alert('Please add your phone number to your account settings.')
 
-  const requestViewing = async () => {
-    if (!user || (profile?.role || user?.user_metadata?.role) !== 'tenant') return alert('Only tenant accounts may request a viewing.')
-    if (!hasPass) return alert('You need an active search pass to request viewing.')
-    setRequesting(true)
-    const res = await fetch('/api/viewing-requests', {
+    const res = await fetch('/api/daraja/stkpush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ property_id: property.id, tenant_id: user.id })
+      body: JSON.stringify({ phoneNumber, amount: 200, userId: user.id })
     })
-    const json = await res.json()
-    setRequesting(false)
-    if (json?.error) {
-      alert('Request failed: ' + json.error)
-    } else {
-      alert('Viewing requested successfully')
-    }
-  }
 
-  const startChat = async (unitId = null) => {
-    if (!user || (profile?.role || user?.user_metadata?.role) !== 'tenant') {
-      return alert('Only tenant accounts may message the property owner.')
-    }
-    const existingThread = await fetchThread(unitId)
-    if (existingThread && existingThread.unit_id === unitId) {
-      router.push(`/chat/${existingThread.id}`)
+    const json = await res.json()
+    if (json?.success) {
+      setHasPass(true)
+      alert(json.bypass ? 'Pass activated instantly.' : 'Payment requested. Your pass will activate after payment is confirmed.')
       return
     }
-    const { data, error } = await supabase.from('chat_threads').insert({
-      property_id: property.id,
-      landlord_id: property.landlord_id,
-      tenant_id: user.id,
-      unit_id: unitId,
-      status: 'open'
-    }).select('id').single()
-    if (error || !data) {
-      console.error(error)
-      return alert('Could not open chat thread. Please try again.')
-    }
-    router.push(`/chat/${data.id}`)
+    alert(json?.error || 'Unable to purchase search pass.')
   }
 
-  if (!property) return <p>Loading...</p>
+  const handleRequestViewing = async () => {
+    if (!user) return alert('Please log in to request a viewing.')
+    if (!hasPass) return alert('You need an active search pass to request a viewing.')
+    setRequesting(true)
+    try {
+      const res = await fetch('/api/viewing-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: property.id, tenant_id: user.id })
+      })
+      const json = await res.json()
+      if (json?.error) throw new Error(json.error)
+      alert('Viewing requested successfully.')
+    } catch (err) {
+      console.error(err)
+      alert('Request failed. Please try again.')
+    } finally {
+      setRequesting(false)
+    }
+  }
 
-  const isTenant = (profile?.role || user?.user_metadata?.role) === 'tenant'
-  const activePass = hasPass && !loadingPass
-  const bookingEnabled = Boolean(bookedDates.length)
+  const handleContactSubmit = async () => {
+    if (!user) return alert('Please log in to contact the landlord.')
+    if (!contactMessage.trim()) return alert('Please enter a message.')
+    setSubmittingContact(true)
+    try {
+      const { error } = await supabase.from('inquiries').insert({
+        property_id: property.id,
+        landlord_id: property.landlord_id,
+        tenant_id: user.id,
+        message: contactMessage.trim(),
+        status: 'pending'
+      })
+      if (error) throw error
+      setShowContact(false)
+      setContactMessage('')
+      alert('Your message has been sent.')
+    } catch (err) {
+      console.error(err)
+      alert('Unable to send your message.')
+    } finally {
+      setSubmittingContact(false)
+    }
+  }
 
-  return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.7fr_0.9fr]">
-      <div className="space-y-4">
-        <div className="rounded-3xl overflow-hidden border bg-white">
-          {
-            (() => {
-              const lng = property.lng ?? property.longitude ?? (property.location && property.location.coordinates ? property.location.coordinates[0] : 34.7617)
-              const lat = property.lat ?? property.latitude ?? (property.location && property.location.coordinates ? property.location.coordinates[1] : -0.0917)
-              return <Map center={[lng, lat]} properties={[property]} />
-            })()
-          }
-        </div>
+  const handleSaveProperty = async () => {
+    if (!user) return alert('Please log in to save this property.')
+    setSaved(true)
+    try {
+      await supabase.from('saved_properties').insert({ property_id: property.id, user_id: user.id })
+    } catch {
+      // ignore local save fallback
+    }
+    alert('Property saved to your favorites.')
+  }
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(property.photos || []).slice(0, 4).map((photo, index) => (
-            <img key={index} src={photo} alt={`Photo ${index + 1}`} className="h-48 w-full rounded-3xl object-cover" />
-          ))}
-        </div>
+  const openDirections = () => {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${coordinates[1]},${coordinates[0]}`, '_blank')
+  }
 
-        <div className="rounded-3xl border bg-white p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-semibold">{property.title || 'Property details'}</h1>
-              <p className="text-sm text-anchorGray mt-2">{property.address || 'No address available'}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">KES {property.price || '—'}</div>
-              <div className="text-sm text-anchorGray">Deposit: KES {property.deposit || '0'}</div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 text-sm text-anchorGray">
-            <div>Type: {property.property_type || '—'}</div>
-            <div>Bedrooms: {property.bedrooms ?? '—'}</div>
-            <div>Bathrooms: {property.bathrooms ?? '—'}</div>
-            <div>Status: {property.verification_status || 'pending'} / {property.available === false ? 'Inactive' : 'Active'}</div>
-            <div>Furnished: {property.furnished ? 'Yes' : 'No'}</div>
-            <div>Water: {(Array.isArray(property.water_supply) ? property.water_supply.join(', ') : property.water_supply) || 'N/A'}</div>
-            <div>Electricity: {(Array.isArray(property.electricity) ? property.electricity.join(', ') : property.electricity) || 'N/A'}</div>
-            <div>Parking: {(Array.isArray(property.parking) ? property.parking.join(', ') : property.parking) || 'N/A'}</div>
-            <div>Backup power: {(Array.isArray(property.backup_power) ? property.backup_power.join(', ') : property.backup_power) || 'N/A'}</div>
-            <div>Internet: {(Array.isArray(property.internet) ? property.internet.join(', ') : property.internet) || 'N/A'}</div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border bg-white p-6">
-          <h2 className="text-xl font-semibold">Units</h2>
-          {units.length ? (
-            <div className="mt-4 grid gap-4">
-              {units
-                .filter((unit) => unit.is_vacant || (unit.available_from && new Date(unit.available_from) <= new Date()))
-                .map((unit) => (
-                  <div key={unit.id || unit.name} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="font-semibold">{unit.name || 'Unit'}</div>
-                        <div className="text-sm text-anchorGray">{unit.property_type || 'Unit'} • {unit.bedrooms} bd • {unit.bathrooms} ba</div>
-                      </div>
-                      <span className={`rounded-full px-2 py-1 text-xs ${unit.is_vacant ? 'bg-mint-hint text-official-teal' : 'bg-estate-red/10 text-estate-red'}`}>
-                        {unit.is_vacant ? 'Vacant' : 'Booked'}
-                      </span>
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 text-sm text-anchorGray">
-                      <div>Rent: KES {unit.rent_price || '—'}</div>
-                      <div>Deposit: KES {unit.deposit || '—'}</div>
-                    </div>
-                    {isTenant ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button className="rounded-full bg-official-teal px-4 py-2 text-sm text-white" onClick={() => startChat(unit.id)}>
-                          Inquire about this unit
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mt-3 text-sm text-anchorGray">
-                        {user ? (
-                          'Only tenant accounts may inquire about this unit.'
-                        ) : (
-                          <>
-                            <Link href="/login" className="text-official-teal underline">Login</Link> to inquire about this unit.
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-anchorGray">No individual units listed for this property.</p>
-          )}
-        </div>
-
-        <div className="rounded-3xl border bg-white p-6">
-          <h2 className="text-xl font-semibold">Owner information</h2>
-          {owner ? (
-            <div className="mt-4 space-y-2 text-sm text-anchorGray">
-              <div>Name: {owner.full_name || 'Unknown'}</div>
-              <div>Phone: {owner.phone || 'Not available'}</div>
-            </div>
-          ) : (
-            <div className="mt-4 text-sm text-anchorGray">Owner details not available.</div>
-          )}
+  if (!property) {
+    return (
+      <div className="mx-auto min-h-[60vh] max-w-5xl px-4 py-16">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold text-slate-900">Property details</h1>
+          <p className="mt-3 text-sm text-slate-600">{error || 'Loading property details...'}</p>
         </div>
       </div>
+    )
+  }
 
-      <aside className="space-y-4">
-        <div className="rounded-3xl border bg-white p-6">
-          <PropertyCard property={property} />
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <button onClick={() => router.push('/map')} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+          ← Back to map
+        </button>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.85fr]">
+        <div className="space-y-6">
+          <PropertyHeader property={property} locationPath={locationPath} />
+          <CoverPhoto photos={photos} />
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Rent</p>
+                <div className="mt-2 text-3xl font-semibold text-slate-900">{formatCurrency(price)}</div>
+              </div>
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Deposit</p>
+                <div className="mt-2 text-3xl font-semibold text-slate-900">{formatCurrency(deposit)}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+              <div>Bedrooms: {property.bedrooms ?? '—'}</div>
+              <div>Bathrooms: {property.bathrooms ?? '—'}</div>
+              <div>Furnished: {property.furnished ? 'Yes' : 'No'}</div>
+              <div>Type: {property.property_type || '—'}</div>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <Description description={description} />
+            <Amenities amenities={amenities} />
+          </div>
+
+          <UnitsList units={units} propertyId={id} hasPass={hasPass} />
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Landlord details</h2>
+            <LandlordCard landlord={landlord} hasPass={hasPass} />
+          </div>
         </div>
 
-        {isTenant && (
-          <div className="rounded-3xl border bg-white p-6 space-y-3">
-            <h2 className="text-xl font-semibold">Tenant actions</h2>
-            {!activePass ? (
-              <button className="w-full rounded-full bg-official-teal px-4 py-3 text-white" onClick={buySearchPass}>Buy Search Pass (KES 200)</button>
-            ) : (
-              <div className="rounded-3xl bg-mint-hint p-4 text-sm text-official-teal">You have an active search pass.</div>
-            )}
-            <button className="w-full rounded-full border border-official-teal px-4 py-3 text-official-teal" onClick={requestViewing} disabled={!activePass || requesting}>
-              {requesting ? 'Requesting…' : 'Request viewing'}
-            </button>
-            <button className="w-full rounded-full bg-white border border-official-teal px-4 py-3 text-official-teal" onClick={startChat}>
-              {thread ? 'Open conversation' : 'Message owner'}
-            </button>
-            {!activePass && <p className="text-sm text-anchorGray">A valid pass is required before requesting a viewing.</p>}
-          </div>
-        )}
+        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Listing</p>
+                <div className="mt-2 text-lg font-semibold text-slate-900">{property.verification_status === 'verified' ? 'Verified' : 'Standard'}</div>
+              </div>
+              <div className="rounded-full bg-[#E8F2EE] px-3 py-1 text-sm font-medium text-[#2C6E5C]">{property.available === false ? 'Booked' : 'Open'}</div>
+            </div>
 
-        {bookingEnabled && (
-          <div className="rounded-3xl border bg-white p-6">
-            <AvailabilityCalendar bookedDates={bookedDates} onToggleDate={() => {}} />
-            <p className="mt-3 text-sm text-anchorGray">Availability is informational only.</p>
+            <div className="mt-6 space-y-3 text-sm text-slate-600">
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">Bedrooms: {property.bedrooms ?? '—'}</div>
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">Bathrooms: {property.bathrooms ?? '—'}</div>
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">Furnished: {property.furnished ? 'Yes' : 'No'}</div>
+            </div>
+
+            <ActionButtons
+              hasPass={hasPass}
+              onContact={() => setShowContact(true)}
+              onRequestViewing={handleRequestViewing}
+              onSave={handleSaveProperty}
+              onBuyPass={handleBuyPass}
+              requesting={requesting}
+            />
           </div>
-        )}
-      </aside>
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <MiniMap property={property} hasPass={hasPass} />
+          </div>
+        </aside>
+      </div>
+
+      <ContactModal
+        isOpen={showContact}
+        onClose={() => setShowContact(false)}
+        property={property}
+        landlord={landlord}
+        user={user}
+      />
     </div>
   )
 }
