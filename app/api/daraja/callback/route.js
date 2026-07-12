@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -69,20 +70,20 @@ export async function POST(request) {
           const payloadVariants = [
             updatePayload,
             {
-              tenant_id: userId || 'guest',
+              tenant_id: userId || randomUUID(),
               user_id: userId,
               session_id: sessionId,
               expires_at: expiresAt,
               paid_amount: amount || 200
             },
             {
-              tenant_id: userId || 'guest',
+              tenant_id: userId || randomUUID(),
               session_id: sessionId,
               expires_at: expiresAt,
               paid_amount: amount || 200
             },
             {
-              tenant_id: userId || 'guest',
+              tenant_id: userId || randomUUID(),
               session_id: sessionId,
               expires_at: expiresAt
             }
