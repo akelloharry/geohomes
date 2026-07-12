@@ -5,14 +5,14 @@ export default function ActionButtons({ hasPass, onContact, onRequestViewing, on
     <div className="mt-6 space-y-3">
       <button
         onClick={onContact}
-        className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white hover:bg-[#23594a] transition"
+        className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#23594a]"
       >
         Contact landlord
       </button>
       <button
         onClick={onRequestViewing}
         disabled={!hasPass || requesting}
-        className="w-full rounded-full border border-[#2C6E5C] px-4 py-3 text-sm font-semibold text-[#2C6E5C] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-full border border-[#2C6E5C] px-4 py-3 text-sm font-semibold text-[#2C6E5C] transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         {requesting ? 'Requesting…' : 'Request viewing'}
       </button>
@@ -25,7 +25,7 @@ export default function ActionButtons({ hasPass, onContact, onRequestViewing, on
       {!hasPass && (
         <button
           onClick={onBuyPass}
-          className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white hover:bg-[#23594a] transition"
+          className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#23594a]"
         >
           Buy search pass
         </button>

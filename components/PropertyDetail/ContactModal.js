@@ -1,58 +1,78 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 
 export default function ContactModal({ isOpen, onClose, property, landlord, user }) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMessage('')
+      setError('')
+      setSent(false)
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
   const handleSubmit = async () => {
-    if (!message.trim()) return
+    if (!message.trim()) {
+      setError('Please enter a message before sending.')
+      return
+    }
+
     setLoading(true)
+    setError('')
 
-    const { error } = await supabase.from('inquiries').insert({
-      property_id: property.id,
-      landlord_id: landlord?.id,
-      tenant_id: user?.id,
-      message: message.trim(),
-      status: 'pending'
-    })
+    try {
+      const { error } = await supabase.from('inquiries').insert({
+        property_id: property.id,
+        landlord_id: landlord?.id,
+        tenant_id: user?.id,
+        message: message.trim(),
+        status: 'pending'
+      })
 
-    setLoading(false)
-    if (!error) {
+      if (error) throw error
+
       setSent(true)
-      setTimeout(() => onClose(), 2000)
+      setTimeout(() => onClose(), 1800)
+    } catch (err) {
+      console.error(err)
+      setError('Unable to send your message right now. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full">
-        <h2 className="font-heading text-xl font-bold text-[#1E3A4D]">Contact Landlord</h2>
-        <p className="text-[#5B6F82] text-sm mt-1">Send a message to {landlord?.first_name || 'the landlord'} about {property.title}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-xl">
+        <h2 className="text-xl font-bold text-[#1E3A4D]">Contact landlord</h2>
+        <p className="mt-1 text-sm text-[#5B6F82]">
+          Send a note about {property?.title || 'this property'} to {landlord?.full_name || 'the landlord'}.
+        </p>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Write your message here..."
-          className="w-full mt-4 p-3 border border-[#BECCD9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2C6E5C] min-h-[100px]"
+          className="mt-4 min-h-[120px] w-full rounded-2xl border border-[#BECCD9] p-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E5C]"
           disabled={loading || sent}
         />
-        <div className="flex gap-3 mt-4">
+        {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+        <div className="mt-4 flex gap-3">
           <button
             onClick={handleSubmit}
             disabled={loading || sent || !message.trim()}
-            className="flex-1 px-6 py-2 bg-[#2C6E5C] text-white font-semibold rounded-lg hover:bg-[#23594a] transition disabled:opacity-50"
+            className="flex-1 rounded-full bg-[#2C6E5C] px-6 py-2 font-semibold text-white transition hover:bg-[#23594a] disabled:opacity-50"
           >
-            {loading ? 'Sending...' : sent ? 'Sent ✓' : 'Send Message'}
+            {loading ? 'Sending...' : sent ? 'Sent ✓' : 'Send message'}
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-[#BECCD9] rounded-lg hover:bg-gray-50 transition"
-          >
+          <button onClick={onClose} className="rounded-full border border-[#BECCD9] px-4 py-2 hover:bg-gray-50">
             Cancel
           </button>
         </div>
