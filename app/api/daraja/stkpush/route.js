@@ -22,6 +22,34 @@ async function getToken(baseUrl, consumerKey, consumerSecret) {
   }
 }
 
+async function ensureTenantProfile(tenantId) {
+  if (!tenantId) return null
+
+  try {
+    const { data: existingProfile, error: lookupError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', tenantId)
+      .maybeSingle()
+
+    if (!lookupError && existingProfile?.id) return existingProfile.id
+
+    const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
+      id: tenantId,
+      full_name: 'Guest Pass',
+      role: 'guest',
+      verified: false
+    }, { onConflict: 'id' })
+
+    if (!upsertError) return tenantId
+    console.warn('Failed to ensure guest profile for pass insertion:', upsertError)
+  } catch (err) {
+    console.warn('Exception ensuring guest profile for pass insertion:', err)
+  }
+
+  return null
+}
+
 export async function POST(req) {
   try {
     const body = await req.json()
@@ -44,23 +72,28 @@ export async function POST(req) {
       let pass = null
       let insertError = null
       const fallbackTenantId = body.userId || null
+      const tenantId = await ensureTenantProfile(body.userId || null)
       const insertPayloads = [
         {
+          tenant_id: tenantId,
           user_id: body.userId || null,
           session_id: body.sessionId || null,
           expires_at: expiresAt,
           paid_amount: Number(amount)
         },
         {
+          tenant_id: tenantId,
           session_id: body.sessionId || null,
           expires_at: expiresAt,
           paid_amount: Number(amount)
         },
         {
+          tenant_id: tenantId,
           session_id: body.sessionId || null,
           expires_at: expiresAt
         },
         {
+          tenant_id: tenantId,
           session_id: body.sessionId || null
         }
       ]
