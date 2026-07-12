@@ -43,26 +43,52 @@ export async function POST(req) {
 
       let pass = null
       let insertError = null
+      const insertPayloads = [
+        {
+          tenant_id: body.userId || null,
+          user_id: body.userId || null,
+          session_id: body.sessionId || null,
+          purchased_at: new Date().toISOString(),
+          expires_at: expiresAt,
+          paid_amount: Number(amount)
+        },
+        {
+          user_id: body.userId || null,
+          session_id: body.sessionId || null,
+          expires_at: expiresAt,
+          paid_amount: Number(amount)
+        },
+        {
+          user_id: body.userId || null,
+          session_id: body.sessionId || null,
+          expires_at: expiresAt
+        },
+        {
+          session_id: body.sessionId || null,
+          expires_at: expiresAt
+        }
+      ]
 
-      try {
-        const response = await supabaseAdmin
-          .from('search_passes')
-          .insert({
-            tenant_id: body.userId || null,
-            user_id: body.userId || null,
-            session_id: body.sessionId || null,
-            purchased_at: new Date().toISOString(),
-            expires_at: expiresAt,
-            paid_amount: Number(amount),
-            payment_ref: `BYPASS-${Date.now()}`
-          })
-          .select()
-          .single()
+      for (const payload of insertPayloads) {
+        try {
+          const response = await supabaseAdmin
+            .from('search_passes')
+            .insert(payload)
+            .select()
+            .single()
 
-        pass = response.data
-        insertError = response.error
-      } catch (err) {
-        insertError = err
+          if (!response.error) {
+            pass = response.data
+            insertError = null
+            break
+          }
+
+          insertError = response.error
+          console.warn('Bypass insert attempt failed with payload:', payload, response.error)
+        } catch (err) {
+          insertError = err
+          console.warn('Bypass insert attempt exception:', payload, err)
+        }
       }
 
       if (insertError) {

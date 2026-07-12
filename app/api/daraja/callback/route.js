@@ -67,8 +67,39 @@ export async function POST(request) {
           const { error } = await supabaseAdmin.from('search_passes').update(updatePayload).eq('id', existingPass.id)
           if (error) console.warn('Failed to update search_passes row', error)
         } else {
-          const { error } = await supabaseAdmin.from('search_passes').insert(updatePayload)
-          if (error) console.warn('Failed to insert search_passes row', error)
+          const payloadVariants = [
+            updatePayload,
+            {
+              user_id: userId,
+              session_id: sessionId,
+              expires_at: expiresAt,
+              paid_amount: amount || 200
+            },
+            {
+              session_id: sessionId,
+              expires_at: expiresAt,
+              paid_amount: amount || 200
+            },
+            {
+              session_id: sessionId,
+              expires_at: expiresAt
+            }
+          ]
+
+          let insertError = null
+          for (const payload of payloadVariants) {
+            const { error } = await supabaseAdmin.from('search_passes').insert(payload)
+            if (!error) {
+              insertError = null
+              break
+            }
+            insertError = error
+            console.warn('Callback insert attempt failed', payload, error)
+          }
+
+          if (insertError) {
+            console.warn('Failed to insert search_passes row', insertError)
+          }
         }
       } catch (e) {
         console.error('Error updating search_passes', e)
