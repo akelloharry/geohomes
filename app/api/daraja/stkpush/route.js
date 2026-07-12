@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -44,28 +43,24 @@ export async function POST(req) {
 
       let pass = null
       let insertError = null
-      const fallbackTenantId = body.userId || randomUUID()
+      const fallbackTenantId = body.userId || null
       const insertPayloads = [
         {
-          tenant_id: fallbackTenantId,
           user_id: body.userId || null,
           session_id: body.sessionId || null,
           expires_at: expiresAt,
           paid_amount: Number(amount)
         },
         {
-          tenant_id: fallbackTenantId,
           session_id: body.sessionId || null,
           expires_at: expiresAt,
           paid_amount: Number(amount)
         },
         {
-          tenant_id: fallbackTenantId,
           session_id: body.sessionId || null,
           expires_at: expiresAt
         },
         {
-          tenant_id: fallbackTenantId,
           session_id: body.sessionId || null
         }
       ]
