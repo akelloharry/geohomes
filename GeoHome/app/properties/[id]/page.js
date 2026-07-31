@@ -133,13 +133,14 @@ export default function PropertyDetail({ params }) {
 
   const handleBuyPass = async () => {
     if (!user) return alert('Please log in to purchase a search pass.')
-    const phoneNumber = user.user_metadata?.phone || ''
-    if (!phoneNumber) return alert('Please add your phone number to your account settings.')
+
+    const phoneNumber = user.user_metadata?.phone || user.user_metadata?.phone_number || ''
+    const sessionId = typeof window !== 'undefined' ? window.localStorage.getItem('geohome_session_id') : null
 
     const res = await fetch('/api/daraja/stkpush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber, amount: 200, userId: user.id })
+      body: JSON.stringify({ phoneNumber: phoneNumber || '254700000000', amount: 200, userId: user.id, sessionId })
     })
 
     const json = await res.json()

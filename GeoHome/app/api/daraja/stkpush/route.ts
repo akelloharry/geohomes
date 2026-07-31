@@ -1,9 +1,26 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { rateLimiter } from '../../../../lib/rateLimiter';
-import supabaseAdmin from '../../../../lib/supabaseAdmin';
 
 const allowedAmounts = [200, 500, 1000];
 const phoneRegex = /^254[0-9]{9}$/;
+
+function getRouteClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey && !anonKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey || anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
 
 function maskPhone(value?: string) {
   if (!value || value.length < 4) return '****';
@@ -68,38 +85,32 @@ export async function POST(request: Request) {
       amount
     });
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Bypass mode enabled but SUPABASE_SERVICE_ROLE_KEY is not configured');
-      return NextResponse.json({ error: 'Supabase service role is not configured' }, { status: 500 });
-    }
+    const routeClient = getRouteClient();
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_URL) {
       console.error('❌ Bypass mode enabled but Supabase URL is not configured');
       return NextResponse.json({ error: 'Supabase URL is not configured' }, { status: 500 });
     }
 
-    if (!supabaseAdmin) {
-      console.error('❌ Supabase admin client could not be initialized');
-      return NextResponse.json({ error: 'Supabase admin client is not available' }, { status: 500 });
+    if (!routeClient) {
+      console.error('❌ Supabase client could not be initialized for bypass mode');
+      return NextResponse.json({ error: 'Supabase client is not available' }, { status: 500 });
     }
 
     const durationDays = userId ? 4 : 3;
     const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
     const numericAmount = Number(amount ?? 200) || 200;
-    const paymentRef = `BYPASS-${Date.now()}`;
 
     console.log(`⏱️ Creating pass with ${durationDays} day expiry, expires at:`, expiresAt.toISOString());
 
-    const { data: pass, error: insertError } = await supabaseAdmin
+    const { data: pass, error: insertError } = await routeClient
       .from('search_passes')
       .insert({
-        tenant_id: userId || null,
         user_id: userId || null,
         session_id: sessionId || null,
         purchased_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
-        paid_amount: numericAmount,
-        payment_ref: paymentRef
+        paid_amount: numericAmount
       })
       .select()
       .single();
@@ -116,8 +127,8 @@ export async function POST(request: Request) {
       bypass: true,
       status: 'bypassed',
       data: {
-        MerchantRequestID: paymentRef,
-        CheckoutRequestID: paymentRef,
+        MerchantRequestID: `BYPASS-${Date.now()}`,
+        CheckoutRequestID: `BYPASS-${Date.now()}`,
         ResponseDescription: 'Bypass mode – pass created successfully',
         pass
       }

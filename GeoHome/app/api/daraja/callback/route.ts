@@ -1,5 +1,22 @@
 import { NextResponse } from 'next/server';
-import supabaseAdmin from '../../../../lib/supabaseAdmin';
+import { createClient } from '@supabase/supabase-js';
+
+function getRouteClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || (!serviceRoleKey && !anonKey)) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey || anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
 
 function maskPhone(value?: string) {
   if (!value || value.length < 4) return '****';
@@ -39,10 +56,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing transaction reference' }, { status: 400 });
     }
 
-    const { data: existing, error: selectError } = await supabaseAdmin
+    const routeClient = getRouteClient();
+    if (!routeClient) {
+      return NextResponse.json({ error: 'Supabase client is not available' }, { status: 500 });
+    }
+
+    const { data: existing, error: selectError } = await routeClient
       .from('search_passes')
       .select('id')
-      .eq('payment_ref', transactionId)
+      .eq('session_id', sessionId || '')
       .maybeSingle();
 
     if (selectError) {
@@ -57,13 +79,13 @@ export async function POST(request: Request) {
 
     const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
     const insertPayload: any = {
-      payment_ref: transactionId,
+      purchased_at: new Date().toISOString(),
       paid_amount: amount,
       expires_at: expiresAt,
       session_id: sessionId || null
     };
 
-    const { error: insertError } = await supabaseAdmin.from('search_passes').insert(insertPayload);
+    const { error: insertError } = await routeClient.from('search_passes').insert(insertPayload);
 
     if (insertError) {
       console.error('Failed to insert search pass:', insertError);
