@@ -44,6 +44,8 @@ export default function PropertyDetail({ params }) {
   const [hasPass, setHasPass] = useState(false)
   const [loadingPass, setLoadingPass] = useState(false)
   const [requesting, setRequesting] = useState(false)
+  const [buyingPass, setBuyingPass] = useState(false)
+  const [savingProperty, setSavingProperty] = useState(false)
   const [showContact, setShowContact] = useState(false)
   const [contactMessage, setContactMessage] = useState('')
   const [submittingContact, setSubmittingContact] = useState(false)
@@ -134,22 +136,30 @@ export default function PropertyDetail({ params }) {
   const handleBuyPass = async () => {
     if (!user) return alert('Please log in to purchase a search pass.')
 
-    const phoneNumber = user.user_metadata?.phone || user.user_metadata?.phone_number || ''
-    const sessionId = typeof window !== 'undefined' ? window.localStorage.getItem('geohome_session_id') : null
+    setBuyingPass(true)
+    try {
+      const phoneNumber = user.user_metadata?.phone || user.user_metadata?.phone_number || ''
+      const sessionId = typeof window !== 'undefined' ? window.localStorage.getItem('geohome_session_id') : null
 
-    const res = await fetch('/api/daraja/stkpush', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phoneNumber || '254700000000', amount: 200, userId: user.id, sessionId })
-    })
+      const res = await fetch('/api/daraja/stkpush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: phoneNumber || '254700000000', amount: 200, userId: user.id, sessionId })
+      })
 
-    const json = await res.json()
-    if (json?.success) {
-      setHasPass(true)
-      alert(json.bypass ? 'Pass activated instantly.' : 'Payment requested. Your pass will activate after payment is confirmed.')
-      return
+      const json = await res.json()
+      if (json?.success) {
+        setHasPass(true)
+        alert(json.bypass ? 'Pass activated instantly.' : 'Payment requested. Your pass will activate after payment is confirmed.')
+        return
+      }
+      alert(json?.error || 'Unable to purchase search pass.')
+    } catch (err) {
+      console.error(err)
+      alert('Unable to purchase search pass.')
+    } finally {
+      setBuyingPass(false)
     }
-    alert(json?.error || 'Unable to purchase search pass.')
   }
 
   const handleRequestViewing = async () => {
@@ -199,13 +209,16 @@ export default function PropertyDetail({ params }) {
 
   const handleSaveProperty = async () => {
     if (!user) return alert('Please log in to save this property.')
+    setSavingProperty(true)
     setSaved(true)
     try {
       await supabase.from('saved_properties').insert({ property_id: property.id, user_id: user.id })
+      alert('Property saved to your favorites.')
     } catch {
-      // ignore local save fallback
+      alert('Property saved locally for now.')
+    } finally {
+      setSavingProperty(false)
     }
-    alert('Property saved to your favorites.')
   }
 
   const openDirections = () => {
@@ -292,6 +305,8 @@ export default function PropertyDetail({ params }) {
               onSave={handleSaveProperty}
               onBuyPass={handleBuyPass}
               requesting={requesting}
+              buyingPass={buyingPass}
+              savingProperty={savingProperty}
             />
           </div>
 

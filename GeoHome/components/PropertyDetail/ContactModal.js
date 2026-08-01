@@ -29,9 +29,10 @@ export default function ContactModal({ isOpen, onClose, property, landlord, user
     setError('')
 
     try {
+      const landlordId = property?.landlord_id || landlord?.id
       const { error } = await supabase.from('inquiries').insert({
         property_id: property.id,
-        landlord_id: landlord?.id,
+        landlord_id: landlordId,
         tenant_id: user?.id,
         message: message.trim(),
         status: 'pending'

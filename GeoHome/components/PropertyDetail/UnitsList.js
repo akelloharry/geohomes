@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useState } from 'react'
 
 function UnitCard({ unit, propertyId, hasPass, occupied }) {
   return (
@@ -29,28 +30,28 @@ function UnitCard({ unit, propertyId, hasPass, occupied }) {
 }
 
 export default function UnitsList({ units, propertyId, hasPass }) {
+  const [showAll, setShowAll] = useState(false)
+
   if (!units || units.length === 0) return null
 
   const vacantUnits = units.filter((unit) => unit.is_vacant ?? true)
   const occupiedUnits = units.filter((unit) => !(unit.is_vacant ?? true))
+  const visibleUnits = showAll ? [...vacantUnits, ...occupiedUnits] : vacantUnits
 
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-[#1E3A4D]">Available units ({vacantUnits.length})</h3>
-      <div className="mt-4 space-y-3">
-        {vacantUnits.map((unit) => (
-          <UnitCard key={unit.id} unit={unit} propertyId={propertyId} hasPass={hasPass} />
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold text-[#1E3A4D]">Available units ({vacantUnits.length})</h3>
         {occupiedUnits.length > 0 ? (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-sm text-[#5B6F82] hover:text-[#2C6E5C]">Show occupied units ({occupiedUnits.length})</summary>
-            <div className="mt-2 space-y-3">
-              {occupiedUnits.map((unit) => (
-                <UnitCard key={unit.id} unit={unit} propertyId={propertyId} hasPass={hasPass} occupied />
-              ))}
-            </div>
-          </details>
+          <button onClick={() => setShowAll((value) => !value)} className="text-sm font-semibold text-[#2C6E5C] hover:underline">
+            {showAll ? 'Show vacant only' : 'Show all units'}
+          </button>
         ) : null}
+      </div>
+      <div className="mt-4 space-y-3">
+        {visibleUnits.map((unit) => (
+          <UnitCard key={unit.id} unit={unit} propertyId={propertyId} hasPass={hasPass} occupied={!(unit.is_vacant ?? true) && showAll} />
+        ))}
       </div>
     </div>
   )
