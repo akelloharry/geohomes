@@ -8,6 +8,7 @@ export interface FilterState {
   furnished: 'any' | 'true' | 'false';
   amenities: string[]; // array of amenity names
   boundaryId: string | null;
+  boundaryName: string | null;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
 }
@@ -20,6 +21,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   furnished: 'any',
   amenities: [],
   boundaryId: null,
+  boundaryName: null,
   setFilters: (filters) =>
     set((state) => ({ ...state, ...filters })),
   resetFilters: () =>
@@ -31,5 +33,6 @@ export const useFilterStore = create<FilterState>((set) => ({
       furnished: 'any',
       amenities: [],
       boundaryId: null,
+      boundaryName: null,
     }),
 }));

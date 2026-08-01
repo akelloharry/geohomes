@@ -6,7 +6,7 @@ import useMapStore from '../lib/useMapStore'
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
-export default function Map({ center = [34.7617, -0.0917], properties = [], radius = 0, onMarkerClick, onMapClick, onPinMove, draggable = false, pinLocation, bbox = null, className = 'w-full h-96 rounded' }) {
+export default function Map({ center = [34.7617, -0.0917], properties = [], radius = 0, onMarkerClick, onMapClick, onPinMove, draggable = false, pinLocation, bbox = null, className = 'w-full h-96 rounded', onMapLoad, zoom = 11, hasPass = true, onRequestPass }) {
   const mapContainer = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -34,6 +34,9 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], radi
       zoom: initialZoom
     })
     mapRef.current.addControl(new mapboxgl.NavigationControl())
+    if (onMapLoad) {
+      onMapLoad(mapRef.current)
+    }
 
     // Add Mapbox Geolocate control (top-right)
     const geolocate = new mapboxgl.GeolocateControl({
@@ -49,7 +52,7 @@ export default function Map({ center = [34.7617, -0.0917], properties = [], radi
     if (!map) return
 
     const targetCenter = userLocation || center
-    map.flyTo({ center: targetCenter, zoom: 11, essential: true })
+    map.flyTo({ center: targetCenter, zoom: zoom ?? 11, essential: true })
 
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []

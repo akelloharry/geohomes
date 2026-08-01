@@ -1,5 +1,7 @@
 'use client';
 
+import type { MouseEvent } from 'react';
+
 interface Property {
   id: string;
   title: string;

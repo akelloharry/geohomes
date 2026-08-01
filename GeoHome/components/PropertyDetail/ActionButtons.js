@@ -1,6 +1,6 @@
 'use client'
 
-export default function ActionButtons({ hasPass, onContact, onRequestViewing, onSave, onBuyPass, requesting }) {
+export default function ActionButtons({ hasPass, onContact, onRequestViewing, onSave, onBuyPass, requesting, buyingPass, savingProperty }) {
   return (
     <div className="mt-6 space-y-3">
       <button
@@ -18,16 +18,18 @@ export default function ActionButtons({ hasPass, onContact, onRequestViewing, on
       </button>
       <button
         onClick={onSave}
-        className="w-full rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700"
+        disabled={savingProperty}
+        className="w-full rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60"
       >
-        Save property
+        {savingProperty ? 'Saving…' : 'Save property'}
       </button>
       {!hasPass && (
         <button
           onClick={onBuyPass}
-          className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#23594a]"
+          disabled={buyingPass}
+          className="w-full rounded-full bg-[#2C6E5C] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#23594a] disabled:opacity-60"
         >
-          Buy search pass
+          {buyingPass ? 'Buying pass…' : 'Buy search pass'}
         </button>
       )}
     </div>

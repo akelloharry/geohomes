@@ -14,7 +14,16 @@ export function SearchBar({ map }: SearchBarProps) {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { setFilters } = useFilterStore();
+  const { setFilters, boundaryName } = useFilterStore((state) => ({
+    setFilters: state.setFilters,
+    boundaryName: state.boundaryName,
+  }));
+
+  useEffect(() => {
+    if (boundaryName && boundaryName !== query) {
+      setQuery(boundaryName);
+    }
+  }, [boundaryName]);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -37,9 +46,8 @@ export function SearchBar({ map }: SearchBarProps) {
   const handleSelect = (boundary: Boundary) => {
     setQuery(boundary.name);
     setIsOpen(false);
-    setFilters({ boundaryId: boundary.id });
+    setFilters({ boundaryId: boundary.id, boundaryName: boundary.name });
 
-    // Fly map to centroid
     if (map) {
       map.flyTo({
         center: [boundary.centroid_lng, boundary.centroid_lat],
@@ -49,13 +57,27 @@ export function SearchBar({ map }: SearchBarProps) {
     }
   };
 
+  const handleInputChange = (value: string) => {
+    setQuery(value);
+    if (value.trim().length === 0) {
+      setResults([]);
+      setIsOpen(false);
+      setFilters({ boundaryId: null, boundaryName: null });
+      return;
+    }
+
+    if (boundaryName && value !== boundaryName) {
+      setFilters({ boundaryId: null, boundaryName: null });
+    }
+  };
+
   return (
     <div className="relative">
       <input
         ref={inputRef}
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => handleInputChange(e.target.value)}
         placeholder="Search for a county, ward, or neighbourhood..."
         className="w-full p-3 rounded-lg border border-[#BECCD9] focus:outline-none focus:ring-2 focus:ring-[#2C6E5C] shadow-sm text-sm bg-white"
       />
